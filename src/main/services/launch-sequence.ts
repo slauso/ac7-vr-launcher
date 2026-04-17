@@ -183,7 +183,8 @@ export class LaunchSequence {
       message: usedScheduledTask
         ? 'UEVR Injector launched silently and is auto-injecting Ace7Game-Win64-Shipping.exe.'
         : 'UEVR Injector launched elevated and is auto-injecting Ace7Game-Win64-Shipping.exe. '
-          + 'Tip: re-run Install & Configure to skip the UAC prompt next time.'
+          + 'Tip: re-run Install & Configure to register the one-click VR injector task and '
+          + 'skip the UAC prompt on future launches.'
     });
 
     // Post-inject crash detector. If AC7 exits inside the early-exit window we
