@@ -62,25 +62,40 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
    *  1. Download + install UEVR (latest release)
    *  2. Deploy AC7 UEVR profile to %APPDATA%\UnrealVR\games\Ace7Game-Win64-Shipping\
    *  3. Apply recommended AC7 game config (borderless, no motion blur, 1920×1080)
+   *
+   * Any step that fails is surfaced as a per-step error status so the UI can
+   * show the user what went wrong instead of an opaque unhandled rejection.
    */
-  ipcMain.handle('setup:full', async (_event, ac7Path?: string) => {
+  ipcMain.handle('setup:full', async (_event, _ac7Path?: string) => {
     const step = (id: string, label: string, status: SetupStepStatus['status'], message?: string) =>
       emit('setup:progress', { id, label, status, message } satisfies SetupStepStatus);
 
     // 1 – UEVR
     step('uevr', 'Download & install UEVR', 'pending');
-    await uevrManager.update((percent) => emit('uevr:progress', percent));
-    step('uevr', 'Download & install UEVR', 'ok');
+    try {
+      await uevrManager.update((percent) => emit('uevr:progress', percent));
+      step('uevr', 'Download & install UEVR', 'ok');
+    } catch (err) {
+      const message = (err as Error).message;
+      step('uevr', 'Download & install UEVR', 'error', message);
+      throw new Error(`UEVR download failed: ${message}`);
+    }
 
     // 2 – Profile
     step('profile', 'Deploy AC7 UEVR profile', 'pending');
     const cfgSrc = fs.existsSync(uevrCfgAsset) ? uevrCfgAsset : null;
-    if (cfgSrc) {
-      await uevrManager.deployAC7Profile(cfgSrc);
-    } else {
-      step('profile', 'Deploy AC7 UEVR profile', 'error', 'Config asset not found — skipped');
+    if (!cfgSrc) {
+      step('profile', 'Deploy AC7 UEVR profile', 'error', `Config asset not found at ${uevrCfgAsset}`);
+      throw new Error(`AC7 UEVR config asset missing at ${uevrCfgAsset}`);
     }
-    if (cfgSrc) step('profile', 'Deploy AC7 UEVR profile', 'ok');
+    try {
+      await uevrManager.deployAC7Profile(cfgSrc);
+      step('profile', 'Deploy AC7 UEVR profile', 'ok');
+    } catch (err) {
+      const message = (err as Error).message;
+      step('profile', 'Deploy AC7 UEVR profile', 'error', message);
+      throw new Error(`Failed to deploy AC7 UEVR profile: ${message}`);
+    }
 
     // 3 – Game config
     step('gameconfig', 'Apply game settings', 'pending');
@@ -92,8 +107,14 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
       useOpenXR: true,
       sequentialRendering: true
     };
-    await gameConfig.apply(defaultProfileSettings);
-    step('gameconfig', 'Apply game settings', 'ok', 'Borderless windowed, motion blur off, 1920×1080');
+    try {
+      await gameConfig.apply(defaultProfileSettings);
+      step('gameconfig', 'Apply game settings', 'ok', 'Borderless windowed, motion blur off, 1920×1080');
+    } catch (err) {
+      const message = (err as Error).message;
+      step('gameconfig', 'Apply game settings', 'error', message);
+      throw new Error(`Failed to apply game settings: ${message}`);
+    }
   });
 
   ipcMain.handle('profile:applyDefault', () => profileManager.applyDefaultProfile());

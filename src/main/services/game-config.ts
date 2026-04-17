@@ -3,12 +3,47 @@ import os from 'node:os';
 import path from 'node:path';
 import type { ProfileSettings } from '@shared/types';
 
-const setOrAppend = (text: string, key: string, value: string): string => {
-  const regex = new RegExp(`^${key}=.*$`, 'm');
-  if (regex.test(text)) {
-    return text.replace(regex, `${key}=${value}`);
+const GAME_USER_SETTINGS_SECTION = '/Script/Engine.GameUserSettings';
+
+/**
+ * Insert or update `key=value` inside the given INI section. If the section
+ * does not exist in the file, it is appended. This matches UE4's strict INI
+ * parser which only reads keys that live under the correct `[Section]` header.
+ */
+const setOrAppendInSection = (
+  text: string,
+  section: string,
+  key: string,
+  value: string
+): string => {
+  // Split the file into its sections. Anything before the first header is
+  // treated as a preamble and preserved verbatim.
+  const headerRegex = /^\[([^\]\r\n]+)\]\s*$/gm;
+  const headers: Array<{ name: string; start: number; bodyStart: number }> = [];
+  let match: RegExpExecArray | null;
+  while ((match = headerRegex.exec(text)) !== null) {
+    headers.push({ name: match[1], start: match.index, bodyStart: match.index + match[0].length });
   }
-  return `${text.trimEnd()}\n${key}=${value}\n`;
+
+  const target = headers.find((h) => h.name === section);
+  if (!target) {
+    // Append a fresh section with the key.
+    const separator = text.length === 0 || text.endsWith('\n') ? '' : '\n';
+    return `${text}${separator}\n[${section}]\n${key}=${value}\n`;
+  }
+
+  const targetIndex = headers.indexOf(target);
+  const bodyEnd = targetIndex + 1 < headers.length ? headers[targetIndex + 1].start : text.length;
+  const before = text.slice(0, target.bodyStart);
+  const body = text.slice(target.bodyStart, bodyEnd);
+  const after = text.slice(bodyEnd);
+
+  const keyRegex = new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}=.*$`, 'm');
+  const updatedBody = keyRegex.test(body)
+    ? body.replace(keyRegex, `${key}=${value}`)
+    : `${body.replace(/\s*$/, '')}\n${key}=${value}\n`;
+
+  return `${before}${updatedBody}${after}`;
 };
 
 export class GameConfigService {
@@ -21,19 +56,19 @@ export class GameConfigService {
     let text = fs.existsSync(this.configPath) ? await fs.promises.readFile(this.configPath, 'utf8') : '';
 
     if (settings.borderlessWindow) {
-      text = setOrAppend(text, 'FullscreenMode', '1');
-      text = setOrAppend(text, 'LastConfirmedFullscreenMode', '1');
+      text = setOrAppendInSection(text, GAME_USER_SETTINGS_SECTION, 'FullscreenMode', '1');
+      text = setOrAppendInSection(text, GAME_USER_SETTINGS_SECTION, 'LastConfirmedFullscreenMode', '1');
     }
     if (settings.disableMotionBlur) {
-      text = setOrAppend(text, 'r.MotionBlurQuality', '0');
+      text = setOrAppendInSection(text, GAME_USER_SETTINGS_SECTION, 'r.MotionBlurQuality', '0');
     }
 
     const [width, height] = settings.resolution.split('x');
     if (width && height) {
-      text = setOrAppend(text, 'ResolutionSizeX', width.trim());
-      text = setOrAppend(text, 'ResolutionSizeY', height.trim());
-      text = setOrAppend(text, 'LastUserConfirmedResolutionSizeX', width.trim());
-      text = setOrAppend(text, 'LastUserConfirmedResolutionSizeY', height.trim());
+      text = setOrAppendInSection(text, GAME_USER_SETTINGS_SECTION, 'ResolutionSizeX', width.trim());
+      text = setOrAppendInSection(text, GAME_USER_SETTINGS_SECTION, 'ResolutionSizeY', height.trim());
+      text = setOrAppendInSection(text, GAME_USER_SETTINGS_SECTION, 'LastUserConfirmedResolutionSizeX', width.trim());
+      text = setOrAppendInSection(text, GAME_USER_SETTINGS_SECTION, 'LastUserConfirmedResolutionSizeY', height.trim());
     }
 
     await fs.promises.writeFile(this.configPath, `${text.trimEnd()}\n`, 'utf8');

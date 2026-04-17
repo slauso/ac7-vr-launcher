@@ -46,8 +46,10 @@ export const LaunchStep: React.FC<{ ac7Path?: string }> = ({ ac7Path }) => {
       <div className="info-box">
         <p>
           Clicking <strong>Launch VR</strong> will: start Virtual Desktop Streamer if needed, launch
-          Ace Combat 7, wait for the game to fully load, then inject the UEVR mod automatically.
-          Once injection is confirmed, put on your <strong>Quest 3</strong> and open the{' '}
+          Ace Combat 7, wait ~25s for the game to fully load, then open the UEVR injector
+          <strong> (Windows will show a UAC prompt — accept it)</strong>. First time only: click
+          <em> Inject</em> in the UEVR window for <code>Ace7Game-Win64-Shipping.exe</code>. After
+          that it auto-injects. Once injected, put on your <strong>Quest 3</strong> and open the{' '}
           <strong>Virtual Desktop</strong> app on the headset to connect.
         </p>
       </div>

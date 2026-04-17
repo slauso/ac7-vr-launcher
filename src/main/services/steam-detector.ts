@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { SoftwareDetectionResult, StatusItem } from '@shared/types';
 import { readRegistryValue } from '../utils/registry';
+import { resolveVirtualDesktopStreamerPath } from '../utils/vd-streamer';
 import { ProcessManager } from './process-manager';
 
 const appManifest = (library: string, appId: string) => path.join(library, 'steamapps', `appmanifest_${appId}.acf`);
@@ -48,9 +49,8 @@ export class SteamDetector {
       : undefined);
     const ac7Installed = Boolean(ac7InstallPath && fs.existsSync(ac7InstallPath));
 
-    const virtualDesktopInstall =
-      'C:\\Program Files\\Virtual Desktop Streamer\\VirtualDesktop.Streamer.exe';
-    const virtualDesktopInstalled = fs.existsSync(virtualDesktopInstall);
+    const virtualDesktopInstall = resolveVirtualDesktopStreamerPath();
+    const virtualDesktopInstalled = Boolean(virtualDesktopInstall);
     const virtualDesktopRunning = this.processManager.isRunning('VirtualDesktop.Streamer.exe');
 
     const items: StatusItem[] = [
@@ -92,11 +92,11 @@ export class SteamDetector {
         label: 'Virtual Desktop Streamer (PC side — Quest 3 connects to this)',
         status: virtualDesktopInstalled && virtualDesktopRunning ? 'ok' : (virtualDesktopInstalled ? 'pending' : 'error'),
         details: virtualDesktopInstalled
-          ? (virtualDesktopRunning ? 'Running — ready for Quest 3 to connect' : 'Installed but not running')
+          ? (virtualDesktopRunning ? `Running — ${virtualDesktopInstall}` : `Installed at ${virtualDesktopInstall} — not running`)
           : 'Not found — install from https://www.vrdesktop.net/',
         actionLabel: virtualDesktopInstalled ? 'Launch' : 'Install',
-        actionUrl: virtualDesktopInstalled
-          ? 'file:///C:/Program%20Files/Virtual%20Desktop%20Streamer/VirtualDesktop.Streamer.exe'
+        actionUrl: virtualDesktopInstalled && virtualDesktopInstall
+          ? `file:///${virtualDesktopInstall.replace(/\\/g, '/').replace(/ /g, '%20')}`
           : 'https://www.vrdesktop.net/'
       }
     ];
