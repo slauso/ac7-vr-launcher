@@ -222,3 +222,37 @@ button:disabled {
 .log-line {
   white-space: pre-wrap;
 }
+
+.info-box {
+  background: rgba(0, 212, 255, 0.06);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #c8e8f5;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.info-box p {
+  margin: 0;
+}
+
+.quest-hint {
+  background: rgba(28, 201, 126, 0.1);
+  border: 1px solid rgba(28, 201, 126, 0.35);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: #82f5bf;
+  font-size: 14px;
+}
+
+.btn-primary {
+  background: rgba(0, 150, 200, 0.25);
+  border-color: #00d4ff;
+  color: #00d4ff;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  background: rgba(0, 212, 255, 0.2);
+}

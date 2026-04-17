@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AC7Api, AppSettings, LaunchStepStatus, ProfileSettings } from '@shared/types';
+import type { AC7Api, AppSettings, LaunchStepStatus, ProfileSettings, SetupStepStatus } from '@shared/types';
 
 const api: AC7Api = {
   checkDependencies: () => ipcRenderer.invoke('deps:check'),
@@ -8,6 +8,7 @@ const api: AC7Api = {
   browseForFolder: () => ipcRenderer.invoke('dialog:browseFolder'),
   getUEVRStatus: () => ipcRenderer.invoke('uevr:status'),
   updateUEVR: () => ipcRenderer.invoke('uevr:update'),
+  fullSetup: (ac7Path?: string) => ipcRenderer.invoke('setup:full', ac7Path),
   applyDefaultProfile: () => ipcRenderer.invoke('profile:applyDefault'),
   importProfile: () => ipcRenderer.invoke('profile:import'),
   exportProfile: () => ipcRenderer.invoke('profile:export'),
@@ -20,6 +21,11 @@ const api: AC7Api = {
     const listener = (_event: Electron.IpcRendererEvent, percent: number) => callback(percent);
     ipcRenderer.on('uevr:progress', listener);
     return () => ipcRenderer.removeListener('uevr:progress', listener);
+  },
+  onSetupProgress: (callback: (step: SetupStepStatus) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, step: SetupStepStatus) => callback(step);
+    ipcRenderer.on('setup:progress', listener);
+    return () => ipcRenderer.removeListener('setup:progress', listener);
   },
   onLaunchUpdate: (callback: (step: LaunchStepStatus) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, step: LaunchStepStatus) => callback(step);

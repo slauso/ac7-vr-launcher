@@ -24,6 +24,7 @@ export const LaunchStep: React.FC<{ ac7Path?: string }> = ({ ac7Path }) => {
     setBusy(true);
     setError(null);
     setLogs([]);
+    setSteps({});
     try {
       await window.ac7.launchVR(ac7Path);
     } catch (err) {
@@ -38,23 +39,42 @@ export const LaunchStep: React.FC<{ ac7Path?: string }> = ({ ac7Path }) => {
     setBusy(false);
   };
 
+  const questStep = steps['quest'];
+
   return (
     <div className="step-body">
+      <div className="info-box">
+        <p>
+          Clicking <strong>Launch VR</strong> will: start Virtual Desktop Streamer if needed, launch
+          Ace Combat 7, wait for the game to fully load, then inject the UEVR mod automatically.
+          Once injection is confirmed, put on your <strong>Quest 3</strong> and open the{' '}
+          <strong>Virtual Desktop</strong> app on the headset to connect.
+        </p>
+      </div>
       <div className="toolbar">
-        <button type="button" disabled={busy} onClick={launch}>Launch VR</button>
+        <button type="button" disabled={busy} onClick={launch} className="btn-primary">
+          🚀 Launch VR
+        </button>
         <button type="button" onClick={() => void abort()}>Stop / Abort</button>
       </div>
-      {error ? <p className="error">{error}</p> : null}
+      {error ? <p className="error">⚠ {error}</p> : null}
+      {questStep ? (
+        <div className="quest-hint">
+          🥽 <strong>{questStep.label}</strong> — {questStep.message}
+        </div>
+      ) : null}
       <div className="status-list">
-        {Object.values(steps).map((step) => (
-          <div key={step.id} className="status-row">
-            <div>
-              <strong>{step.label}</strong>
-              {step.message ? <div className="muted">{step.message}</div> : null}
+        {Object.values(steps)
+          .filter((s) => s.id !== 'quest')
+          .map((step) => (
+            <div key={step.id} className="status-row">
+              <div>
+                <strong>{step.label}</strong>
+                {step.message ? <div className="muted">{step.message}</div> : null}
+              </div>
+              <StatusBadge status={step.status} />
             </div>
-            <StatusBadge status={step.status} />
-          </div>
-        ))}
+          ))}
       </div>
       <LogPanel lines={logs} />
     </div>

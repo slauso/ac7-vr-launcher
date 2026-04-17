@@ -23,10 +23,17 @@ export const SoftwareDetectStep: React.FC<{
 
   return (
     <div className="step-body">
+      <div className="info-box">
+        <p>
+          <strong>How it works:</strong> Your Quest 3 headset runs the <em>Virtual Desktop</em> app.
+          The PC runs the <em>Virtual Desktop Streamer</em> — this is what we start here.
+          SteamVR is <em>not required</em> for this setup.
+        </p>
+      </div>
       <div className="toolbar">
         <button type="button" onClick={detect}>Detect Software</button>
       </div>
-      <PathPicker label="Ace Combat 7 Install Path" value={ac7Path} onChange={(value) => onAc7Path(value)} />
+      <PathPicker label="Ace Combat 7 Install Path (auto-detected, or browse)" value={ac7Path} onChange={(value) => onAc7Path(value)} />
       {error ? <p className="error">{error}</p> : null}
       <div className="status-list">
         {result?.items.map((item) => (

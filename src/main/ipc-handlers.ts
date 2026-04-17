@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
-import type { AppSettings, ProfileSettings } from '@shared/types';
+import type { AppSettings, ProfileSettings, SetupStepStatus } from '@shared/types';
 import { DependencyChecker } from './services/dependency-checker';
 import { GameConfigService } from './services/game-config';
 import { LaunchSequence } from './services/launch-sequence';
@@ -13,6 +13,7 @@ import { UEVRManager } from './services/uevr-manager';
 
 const managedRoot = path.join(os.homedir(), 'AppData', 'Roaming', 'ac7-vr-launcher');
 const settingsPath = path.join(managedRoot, 'settings.json');
+const uevrCfgAsset = path.resolve(__dirname, '../assets/ac7-uevr.cfg');
 
 const processManager = new ProcessManager();
 const dependencyChecker = new DependencyChecker();
@@ -40,6 +41,8 @@ const writeSettings = async (settings: AppSettings): Promise<void> => {
 };
 
 export const registerIpcHandlers = (window: BrowserWindow): void => {
+  const emit = (channel: string, payload: unknown) => window.webContents.send(channel, payload);
+
   ipcMain.handle('deps:check', () => dependencyChecker.check());
   ipcMain.handle('software:detect', (_event, manualPath?: string) => steamDetector.detect(manualPath));
   ipcMain.handle('shell:openExternal', async (_event, url: string) => shell.openExternal(url));
@@ -51,9 +54,46 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
 
   ipcMain.handle('uevr:status', () => uevrManager.getStatus());
   ipcMain.handle('uevr:update', async () => {
-    return uevrManager.update((percent) => {
-      window.webContents.send('uevr:progress', percent);
-    });
+    return uevrManager.update((percent) => emit('uevr:progress', percent));
+  });
+
+  /**
+   * One-click full setup:
+   *  1. Download + install UEVR (latest release)
+   *  2. Deploy AC7 UEVR profile to %APPDATA%\UnrealVR\games\Ace7Game-Win64-Shipping\
+   *  3. Apply recommended AC7 game config (borderless, no motion blur, 1920×1080)
+   */
+  ipcMain.handle('setup:full', async (_event, ac7Path?: string) => {
+    const step = (id: string, label: string, status: SetupStepStatus['status'], message?: string) =>
+      emit('setup:progress', { id, label, status, message } satisfies SetupStepStatus);
+
+    // 1 – UEVR
+    step('uevr', 'Download & install UEVR', 'pending');
+    await uevrManager.update((percent) => emit('uevr:progress', percent));
+    step('uevr', 'Download & install UEVR', 'ok');
+
+    // 2 – Profile
+    step('profile', 'Deploy AC7 UEVR profile', 'pending');
+    const cfgSrc = fs.existsSync(uevrCfgAsset) ? uevrCfgAsset : null;
+    if (cfgSrc) {
+      await uevrManager.deployAC7Profile(cfgSrc);
+    } else {
+      step('profile', 'Deploy AC7 UEVR profile', 'error', 'Config asset not found — skipped');
+    }
+    if (cfgSrc) step('profile', 'Deploy AC7 UEVR profile', 'ok');
+
+    // 3 – Game config
+    step('gameconfig', 'Apply game settings', 'pending');
+    const defaultProfileSettings: ProfileSettings = {
+      borderlessWindow: true,
+      disableMotionBlur: true,
+      resolution: '1920x1080',
+      headTracking: true,
+      useOpenXR: true,
+      sequentialRendering: true
+    };
+    await gameConfig.apply(defaultProfileSettings);
+    step('gameconfig', 'Apply game settings', 'ok', 'Borderless windowed, motion blur off, 1920×1080');
   });
 
   ipcMain.handle('profile:applyDefault', () => profileManager.applyDefaultProfile());
@@ -81,8 +121,8 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
   ipcMain.handle('launch:start', async (_event, ac7Path?: string) => {
     await launchSequence.run(
       ac7Path,
-      (step) => window.webContents.send('launch:update', step),
-      (line) => window.webContents.send('launch:log', line)
+      (step) => emit('launch:update', step),
+      (line) => emit('launch:log', line)
     );
   });
 

@@ -44,13 +44,14 @@ npm test
 ## Usage
 
 1. Open **System Check** and verify required dependencies.
-2. Run **Software Detection** and confirm SteamVR, AC7, and Virtual Desktop state.
-3. Open **UEVR Mod** and install or update UEVR.
-4. Apply **Profile & Config** defaults (or import your own profile).
-5. Use **Launch VR** to run SteamVR → Virtual Desktop Streamer → AC7 → UEVR injection.
+2. Run **Software Detection** to confirm Steam, AC7, and Virtual Desktop Streamer (PC side) state. SteamVR is **not required** for Quest 3 + Virtual Desktop.
+3. Open **Install Mod** and click **Install & Configure** — downloads UEVR, deploys the AC7 VR profile automatically, and applies recommended game settings.
+4. Adjust optional per-setting toggles in **Game Settings** if needed.
+5. Use **Launch VR** to start Virtual Desktop Streamer → Ace Combat 7 → UEVR injection. Once injection is confirmed, put on your Quest 3 and open the Virtual Desktop app on the headset to connect.
 6. Configure optional preferences in **Settings & About**.
 
 ## Notes
 
 - Windows x64 is the only supported platform target.
 - Registry and process checks rely on Windows shell tooling (`reg query`, `tasklist`).
+- SteamVR is **not** part of the Quest 3 + Virtual Desktop flow and is not started by the launcher.

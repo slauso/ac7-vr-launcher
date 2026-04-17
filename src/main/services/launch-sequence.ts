@@ -16,25 +16,22 @@ export class LaunchSequence {
     onStep: (step: LaunchStepStatus) => void,
     onLog: (line: string) => void
   ): Promise<void> {
-    onStep({ id: 'steamvr', label: 'Start SteamVR', status: 'pending' });
-    if (!this.processManager.isRunning('vrserver.exe')) {
-      this.processManager.launch('steamvr', 'cmd', ['/c', 'start', 'steam://run/250820'], onLog);
-      await sleep(3000);
-    }
-    onStep({ id: 'steamvr', label: 'Start SteamVR', status: 'ok' });
-
-    onStep({ id: 'vd', label: 'Start Virtual Desktop Streamer', status: 'pending' });
+    // Step 1 – Virtual Desktop Streamer (PC side)
+    onStep({ id: 'vd', label: 'Virtual Desktop Streamer (PC)', status: 'pending' });
     if (!this.processManager.isRunning('VirtualDesktop.Streamer.exe')) {
       const vdPath = 'C:\\Program Files\\Virtual Desktop Streamer\\VirtualDesktop.Streamer.exe';
       if (fs.existsSync(vdPath)) {
         this.processManager.launch('virtual-desktop', `"${vdPath}"`, [], onLog);
         await sleep(2000);
       } else {
-        throw new Error('Virtual Desktop Streamer is not installed');
+        throw new Error(
+          'Virtual Desktop Streamer is not installed. Install it from https://www.vrdesktop.net/ and sign in before continuing.'
+        );
       }
     }
-    onStep({ id: 'vd', label: 'Start Virtual Desktop Streamer', status: 'ok' });
+    onStep({ id: 'vd', label: 'Virtual Desktop Streamer (PC)', status: 'ok' });
 
+    // Step 2 – Launch Ace Combat 7
     onStep({ id: 'ac7', label: 'Launch Ace Combat 7', status: 'pending' });
     if (ac7Path && fs.existsSync(ac7Path)) {
       const binary = path.join(ac7Path, 'Game', 'Binaries', 'Win64', 'Ace7Game-Win64-Shipping.exe');
@@ -47,6 +44,7 @@ export class LaunchSequence {
       this.processManager.launch('ac7', 'cmd', ['/c', 'start', 'steam://rungameid/502500'], onLog);
     }
 
+    // Wait for the game process to appear
     let pid: number | null = null;
     for (let i = 0; i < 30; i += 1) {
       pid = this.processManager.findPid('Ace7Game-Win64-Shipping.exe');
@@ -58,13 +56,24 @@ export class LaunchSequence {
     }
     onStep({ id: 'ac7', label: 'Launch Ace Combat 7', status: 'ok', message: `PID ${pid}` });
 
-    onStep({ id: 'inject', label: 'Inject UEVR', status: 'pending' });
+    // Step 3 – Inject UEVR
+    onStep({ id: 'inject', label: 'Inject UEVR mod', status: 'pending' });
     const injectorPath = path.join(this.uevrManagedPath, 'UEVRInjector.exe');
     if (!fs.existsSync(injectorPath)) {
-      throw new Error(`Missing injector at ${injectorPath}`);
+      throw new Error(`UEVR injector not found at ${injectorPath} — run Install & Configure first.`);
     }
     this.processManager.launch('uevr-injector', `"${injectorPath}"`, [String(pid)], onLog);
-    onStep({ id: 'inject', label: 'Inject UEVR', status: 'ok' });
+    // Give the injector a moment to attach
+    await sleep(3000);
+    onStep({ id: 'inject', label: 'Inject UEVR mod', status: 'ok' });
+
+    // Step 4 – Prompt the user to connect from their headset
+    onStep({
+      id: 'quest',
+      label: '🥽 Put on your Quest 3',
+      status: 'ok',
+      message: 'Open the Virtual Desktop app on your headset and connect to this PC.'
+    });
   }
 
   public abort(): void {

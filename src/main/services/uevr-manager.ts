@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import https from 'node:https';
+import os from 'node:os';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
 import type { UEVRReleaseInfo, UEVRStatus } from '@shared/types';
@@ -10,11 +11,20 @@ interface GitHubRelease {
   assets: Array<{ name: string; browser_download_url: string }>;
 }
 
+/** Directory where UEVR reads game-specific configs */
+const UEVR_GAMES_DIR = path.join(os.homedir(), 'AppData', 'Roaming', 'UnrealVR', 'games');
+/** Process name without extension for Ace Combat 7 — used as UEVR's game profile directory name */
+const AC7_PROCESS_NAME = 'Ace7Game-Win64-Shipping';
+
 export class UEVRManager {
   constructor(private readonly managedRoot: string) {}
 
   public get managedPath(): string {
     return path.join(this.managedRoot, 'uevr');
+  }
+
+  public get ac7ProfileDir(): string {
+    return path.join(UEVR_GAMES_DIR, AC7_PROCESS_NAME);
   }
 
   public async getLatestRelease(): Promise<UEVRReleaseInfo> {
@@ -51,6 +61,13 @@ export class UEVRManager {
     };
   }
 
+  /** Deploy the AC7-specific UEVR config to the location UEVR reads at injection time */
+  public async deployAC7Profile(configSourcePath: string): Promise<void> {
+    await fs.promises.mkdir(this.ac7ProfileDir, { recursive: true });
+    const destPath = path.join(this.ac7ProfileDir, 'config.txt');
+    await fs.promises.copyFile(configSourcePath, destPath);
+  }
+
   public async getStatus(): Promise<UEVRStatus> {
     await fs.promises.mkdir(this.managedPath, { recursive: true });
     const versionFile = path.join(this.managedPath, 'version.txt');
@@ -59,10 +76,13 @@ export class UEVRManager {
       : undefined;
 
     const injectorExists = fs.existsSync(path.join(this.managedPath, 'UEVRInjector.exe'));
+    const profileDeployed = fs.existsSync(path.join(this.ac7ProfileDir, 'config.txt'));
+
     return {
       installedVersion,
       managedPath: this.managedPath,
-      injectorExists
+      injectorExists,
+      profileDeployed
     };
   }
 

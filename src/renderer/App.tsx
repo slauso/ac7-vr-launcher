@@ -19,8 +19,8 @@ export const App: React.FC = () => {
         canProceed: systemStepReady
       },
       { title: 'Software Detection', content: <SoftwareDetectStep ac7Path={ac7Path} onAc7Path={setAc7Path} /> },
-      { title: 'UEVR Mod', content: <UEVRModStep /> },
-      { title: 'Profile & Config', content: <ProfileConfigStep /> },
+      { title: 'Install Mod', content: <UEVRModStep ac7Path={ac7Path} /> },
+      { title: 'Game Settings', content: <ProfileConfigStep /> },
       { title: 'Launch VR', content: <LaunchStep ac7Path={ac7Path} /> },
       { title: 'Settings & About', content: <SettingsStep /> }
     ],

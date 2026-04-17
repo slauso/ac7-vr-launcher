@@ -70,11 +70,13 @@ export class SteamDetector {
         actionUrl: 'steam://open/main'
       },
       {
+        // SteamVR is NOT required for Quest 3 + Virtual Desktop. Listed here as info only.
         id: 'steamvr',
-        label: 'SteamVR installed (AppID 250820)',
-        status: steamVRInstalled ? 'ok' : 'error',
-        actionLabel: steamVRInstalled ? 'Launch' : 'Install',
-        actionUrl: steamVRInstalled ? undefined : 'steam://install/250820'
+        label: 'SteamVR (not required for Quest 3 + Virtual Desktop)',
+        status: steamVRInstalled ? 'ok' : 'unknown',
+        details: steamVRInstalled ? 'Installed' : 'Not detected — not needed for this setup',
+        actionLabel: 'Info',
+        actionUrl: 'https://store.steampowered.com/app/250820/SteamVR/'
       },
       {
         id: 'ac7',
@@ -85,12 +87,17 @@ export class SteamDetector {
         actionUrl: ac7Installed ? 'steam://rungameid/502500' : 'steam://install/502500'
       },
       {
+        // Virtual Desktop Streamer runs on this PC. The Quest 3 headset connects to it.
         id: 'vd',
-        label: 'Virtual Desktop Streamer installed/running',
+        label: 'Virtual Desktop Streamer (PC side — Quest 3 connects to this)',
         status: virtualDesktopInstalled && virtualDesktopRunning ? 'ok' : (virtualDesktopInstalled ? 'pending' : 'error'),
-        details: virtualDesktopInstall,
+        details: virtualDesktopInstalled
+          ? (virtualDesktopRunning ? 'Running — ready for Quest 3 to connect' : 'Installed but not running')
+          : 'Not found — install from https://www.vrdesktop.net/',
         actionLabel: virtualDesktopInstalled ? 'Launch' : 'Install',
-        actionUrl: virtualDesktopInstalled ? 'file:///C:/Program%20Files/Virtual%20Desktop%20Streamer/VirtualDesktop.Streamer.exe' : 'https://www.vrdesktop.net/'
+        actionUrl: virtualDesktopInstalled
+          ? 'file:///C:/Program%20Files/Virtual%20Desktop%20Streamer/VirtualDesktop.Streamer.exe'
+          : 'https://www.vrdesktop.net/'
       }
     ];
 

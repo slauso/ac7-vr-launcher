@@ -39,6 +39,15 @@ export interface UEVRStatus {
   latestVersion?: string;
   managedPath: string;
   injectorExists: boolean;
+  /** True when the AC7 UEVR config has been deployed to %APPDATA%\UnrealVR\games\Ace7Game-Win64-Shipping\ */
+  profileDeployed: boolean;
+}
+
+export interface SetupStepStatus {
+  id: string;
+  label: string;
+  status: StatusState;
+  message?: string;
 }
 
 export interface ProfileSettings {
@@ -71,6 +80,8 @@ export interface AC7Api {
   browseForFolder: () => Promise<string | null>;
   getUEVRStatus: () => Promise<UEVRStatus>;
   updateUEVR: () => Promise<UEVRStatus>;
+  /** One-click: download UEVR + deploy AC7 profile + apply game config */
+  fullSetup: (ac7Path?: string) => Promise<void>;
   applyDefaultProfile: () => Promise<string>;
   importProfile: () => Promise<string | null>;
   exportProfile: () => Promise<string | null>;
@@ -80,6 +91,7 @@ export interface AC7Api {
   getSettings: () => Promise<AppSettings>;
   saveSettings: (settings: AppSettings) => Promise<void>;
   onUEVRProgress: (callback: (percent: number) => void) => () => void;
+  onSetupProgress: (callback: (step: SetupStepStatus) => void) => () => void;
   onLaunchUpdate: (callback: (step: LaunchStepStatus) => void) => () => void;
   onLog: (callback: (line: string) => void) => () => void;
 }
