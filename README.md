@@ -30,9 +30,21 @@ Make sure all of the following are already set up and working **outside VR** fir
 
 ### Step 1 — Download the launcher
 
-1. Go to the project's **Releases** page: <https://github.com/slauso/ac7-vr-launcher/releases>.
-2. Download the latest installer. It is named something like **`AC7-VR-Launcher-<version>-Setup.exe`**.
-3. If Releases is empty, the installer has not been published yet — either wait for a release or see the **Build** section below to build it yourself from source.
+> ⚠️ **Do not use the green "Code → Download ZIP" button on GitHub.** That ZIP contains the launcher's _source code_ (folders like `src/`, `package.json`, `webpack.config.ts`) and **does not** contain a clickable installer. Use one of the two paths below instead.
+
+**Option A — From the Releases page (recommended):**
+
+1. Go to <https://github.com/slauso/ac7-vr-launcher/releases>.
+2. On the latest release, click the file named **`AC7-VR-Launcher-<version>-Setup.exe`** under **Assets** to download it.
+
+**Option B — From the latest CI build (if Releases is empty):**
+
+1. Go to <https://github.com/slauso/ac7-vr-launcher/actions/workflows/release.yml>.
+2. Click the most recent successful run (green check mark) at the top.
+3. Scroll to the **Artifacts** section at the bottom and download **`ac7-vr-launcher-windows-installer`** (a small ZIP).
+4. Open that ZIP — inside is the **`AC7-VR-Launcher-<version>-Setup.exe`** file. That is the one-click installer.
+
+> If neither option shows an installer, the build hasn't finished yet — wait a few minutes for the workflow to complete, then refresh.
 
 ### Step 2 — Install the launcher
 

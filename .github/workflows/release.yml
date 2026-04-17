@@ -1,22 +1,31 @@
 # Build the Windows NSIS installer (`AC7-VR-Launcher-<version>-Setup.exe`)
-# and publish it to the GitHub Release. This is what makes the README's
-# "go to the Releases page and download the installer" instructions work
-# without anyone having to clone the repo and run electron-builder locally.
+# so end users always have a one-click EXE to download — they never have to
+# clone the repo or run electron-builder themselves.
 #
 # Triggers:
-#   * Push of a tag like `v1.2.3`         → builds and publishes to a Release
-#                                            named after the tag.
-#   * Manual `workflow_dispatch`           → builds the installer and uploads
-#                                            it as a workflow artifact only
-#                                            (no Release is created), useful
-#                                            for testing release builds before
-#                                            tagging.
+#   * Push to `main` or the working branch → builds the installer and uploads
+#                                            it as a workflow artifact, so an
+#                                            EXE is grabbable from the Actions
+#                                            tab even before the first tagged
+#                                            release.
+#   * Push of a tag like `v1.2.3`           → builds AND publishes to a real
+#                                            GitHub Release named after the
+#                                            tag (this is what the README
+#                                            points end users at).
+#   * Manual `workflow_dispatch`            → on-demand build, artifact only.
 name: Build Windows installer
 
 on:
   push:
+    # Tag pushes (`v1.2.3`) cut a real GitHub Release with the installer
+    # attached. Branch pushes (main + the working branch) build the same
+    # installer and upload it as a workflow artifact, so an EXE is always
+    # available from the Actions tab even before the first tagged release.
     tags:
       - 'v*'
+    branches:
+      - main
+      - copilot/build-electron-typescript-wizard
   workflow_dispatch:
 
 permissions:
