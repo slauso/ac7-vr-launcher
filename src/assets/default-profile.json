@@ -1,0 +1,16 @@
+{
+  "profileName": "Ace Combat 7 - Quest 3 Virtual Desktop",
+  "runtime": "OpenXR",
+  "renderingMethod": "SyncedSequential",
+  "headTracking": true,
+  "hud": {
+    "overlayScale": 0.9,
+    "overlayDistance": 1.1,
+    "cockpitReadabilityBoost": true
+  },
+  "recommended": {
+    "disableMotionBlur": true,
+    "borderlessWindow": true,
+    "resolution": "1920x1080"
+  }
+}

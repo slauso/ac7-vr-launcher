@@ -1,0 +1,93 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import type { AppSettings, ProfileSettings } from '@shared/types';
+import { DependencyChecker } from './services/dependency-checker';
+import { GameConfigService } from './services/game-config';
+import { LaunchSequence } from './services/launch-sequence';
+import { ProcessManager } from './services/process-manager';
+import { ProfileManager } from './services/profile-manager';
+import { SteamDetector } from './services/steam-detector';
+import { UEVRManager } from './services/uevr-manager';
+
+const managedRoot = path.join(os.homedir(), 'AppData', 'Roaming', 'ac7-vr-launcher');
+const settingsPath = path.join(managedRoot, 'settings.json');
+
+const processManager = new ProcessManager();
+const dependencyChecker = new DependencyChecker();
+const steamDetector = new SteamDetector(processManager);
+const uevrManager = new UEVRManager(managedRoot);
+const profileManager = new ProfileManager(managedRoot, path.resolve(__dirname, '../assets/default-profile.json'));
+const gameConfig = new GameConfigService();
+const launchSequence = new LaunchSequence(processManager, uevrManager.managedPath);
+
+const defaultSettings: AppSettings = {
+  theme: 'dark-blue',
+  autoUpdateUEVR: true,
+  minimizeToTray: false
+};
+
+const readSettings = async (): Promise<AppSettings> => {
+  if (!fs.existsSync(settingsPath)) return defaultSettings;
+  const parsed = JSON.parse(await fs.promises.readFile(settingsPath, 'utf8')) as Partial<AppSettings>;
+  return { ...defaultSettings, ...parsed };
+};
+
+const writeSettings = async (settings: AppSettings): Promise<void> => {
+  await fs.promises.mkdir(path.dirname(settingsPath), { recursive: true });
+  await fs.promises.writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
+};
+
+export const registerIpcHandlers = (window: BrowserWindow): void => {
+  ipcMain.handle('deps:check', () => dependencyChecker.check());
+  ipcMain.handle('software:detect', (_event, manualPath?: string) => steamDetector.detect(manualPath));
+  ipcMain.handle('shell:openExternal', async (_event, url: string) => shell.openExternal(url));
+
+  ipcMain.handle('dialog:browseFolder', async () => {
+    const result = await dialog.showOpenDialog(window, { properties: ['openDirectory'] });
+    return result.canceled ? null : result.filePaths[0];
+  });
+
+  ipcMain.handle('uevr:status', () => uevrManager.getStatus());
+  ipcMain.handle('uevr:update', async () => {
+    return uevrManager.update((percent) => {
+      window.webContents.send('uevr:progress', percent);
+    });
+  });
+
+  ipcMain.handle('profile:applyDefault', () => profileManager.applyDefaultProfile());
+  ipcMain.handle('profile:import', async () => {
+    const result = await dialog.showOpenDialog(window, {
+      properties: ['openFile'],
+      filters: [{ name: 'Profile', extensions: ['json', 'txt'] }]
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    return profileManager.importProfile(result.filePaths[0]);
+  });
+
+  ipcMain.handle('profile:export', async () => {
+    const result = await dialog.showSaveDialog(window, {
+      title: 'Export UEVR Profile',
+      defaultPath: 'ac7-profile.json',
+      filters: [{ name: 'Profile', extensions: ['json'] }]
+    });
+    if (result.canceled || !result.filePath) return null;
+    return profileManager.exportProfile(result.filePath);
+  });
+
+  ipcMain.handle('game:applyConfig', (_event, settings: ProfileSettings) => gameConfig.apply(settings));
+
+  ipcMain.handle('launch:start', async (_event, ac7Path?: string) => {
+    await launchSequence.run(
+      ac7Path,
+      (step) => window.webContents.send('launch:update', step),
+      (line) => window.webContents.send('launch:log', line)
+    );
+  });
+
+  ipcMain.handle('launch:abort', () => launchSequence.abort());
+
+  ipcMain.handle('settings:get', () => readSettings());
+  ipcMain.handle('settings:save', async (_event, settings: AppSettings) => writeSettings(settings));
+};

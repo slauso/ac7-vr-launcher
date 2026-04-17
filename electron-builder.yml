@@ -1,0 +1,21 @@
+appId: com.slauso.ac7vrlauncher
+productName: AC7 VR Launcher
+directories:
+  output: release
+files:
+  - dist/**/*
+  - package.json
+  - src/assets/icon.png
+extraResources:
+  - from: src/assets/default-profile.json
+    to: assets/default-profile.json
+win:
+  target:
+    - nsis
+  icon: src/assets/icon.png
+  artifactName: AC7-VR-Launcher-${version}-Setup.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  createDesktopShortcut: always
