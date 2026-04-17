@@ -55,12 +55,5 @@
     "webpack": "^5.106.2",
     "webpack-cli": "^7.0.2",
     "webpack-dev-server": "^5.2.3"
-  },
-  "build": {
-    "appId": "com.slauso.ac7vrlauncher",
-    "productName": "AC7 VR Launcher",
-    "directories": {
-      "output": "release"
-    }
   }
 }

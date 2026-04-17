@@ -100,10 +100,28 @@ npm run dev
 
 ## Build
 
+End users do **not** need to build anything — grab the latest `AC7-VR-Launcher-<version>-Setup.exe` from the [Releases page](https://github.com/slauso/ac7-vr-launcher/releases) and run it.
+
+### Releasing a new version (maintainers)
+
+Pushing a `v*` tag triggers `.github/workflows/release.yml`, which builds the Windows NSIS installer on `windows-latest`, attaches it to a GitHub Release named after the tag, and also uploads `latest.yml` for future in-app auto-updates:
+
 ```bash
+npm version patch          # bumps package.json + creates a v<x.y.z> tag
+git push --follow-tags
+```
+
+You can also trigger the workflow manually from the Actions tab (`Build Windows installer` → **Run workflow**) to produce an installer artifact without cutting a release.
+
+### Building locally on Windows
+
+```bash
+npm install
 npm run build
 npm run package
 ```
+
+The resulting installer lands in `release/AC7-VR-Launcher-<version>-Setup.exe`. It is a per-user install that creates a Desktop shortcut and a Start-Menu entry under **Games → AC7 VR Launcher**, requires no admin rights to install, and offers to launch the wizard at the end so the user can run **Install &amp; Configure** in one sitting.
 
 ## Test / Lint
 

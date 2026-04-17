@@ -1,0 +1,78 @@
+# Build the Windows NSIS installer (`AC7-VR-Launcher-<version>-Setup.exe`)
+# and publish it to the GitHub Release. This is what makes the README's
+# "go to the Releases page and download the installer" instructions work
+# without anyone having to clone the repo and run electron-builder locally.
+#
+# Triggers:
+#   * Push of a tag like `v1.2.3`         → builds and publishes to a Release
+#                                            named after the tag.
+#   * Manual `workflow_dispatch`           → builds the installer and uploads
+#                                            it as a workflow artifact only
+#                                            (no Release is created), useful
+#                                            for testing release builds before
+#                                            tagging.
+name: Build Windows installer
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write  # required so softprops/action-gh-release can attach assets
+
+jobs:
+  build-windows:
+    name: Build NSIS installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (TypeScript noEmit)
+        run: npm run lint
+
+      - name: Build (webpack)
+        run: npm run build
+
+      - name: Package (electron-builder NSIS)
+        # GH_TOKEN is required by electron-builder to skip code-signing prompts
+        # in CI even though we're publishing via softprops/action-gh-release
+        # below rather than electron-builder's --publish flag.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win nsis --publish never
+
+      - name: Upload installer as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ac7-vr-launcher-windows-installer
+          path: |
+            release/AC7-VR-Launcher-*-Setup.exe
+            release/latest.yml
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          # Attach the installer + electron-builder's auto-update manifest
+          # so future versions can ship in-app updates without changing this
+          # workflow.
+          files: |
+            release/AC7-VR-Launcher-*-Setup.exe
+            release/latest.yml
+          generate_release_notes: true
+          fail_on_unmatched_files: true
