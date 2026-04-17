@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { LaunchStepStatus } from '@shared/types';
 import { launchElevated } from '../utils/elevate';
+import { runInjectorTask, taskExists } from '../utils/scheduled-task';
 import { resolveVirtualDesktopStreamerPath } from '../utils/vd-streamer';
 import { ERRORS } from './error-catalog';
 import { ProcessManager } from './process-manager';
@@ -24,6 +25,13 @@ const UE4_WARMUP_SECONDS_EXTRA = 60;
  * "Retry with extra warmup" button.
  */
 const AC7_EARLY_EXIT_WINDOW_SECONDS = 60;
+
+/**
+ * Game executable name (with .exe) passed to UEVRInjector via `--attach=`.
+ * The frontend matches case-insensitively and strips the extension before
+ * polling Process.GetProcessesByName, so this is the canonical form to use.
+ */
+const AC7_PROCESS_EXE = 'Ace7Game-Win64-Shipping.exe';
 
 /**
  * Attach an error-catalog entry to a thrown error. The rendered UI reads
@@ -127,10 +135,19 @@ export class LaunchSequence {
     }
     onStep({ id: 'warmup', label: 'Wait for game to finish loading', status: 'ok' });
 
-    // Step 4 – Inject UEVR. UEVRInjector.exe is a GUI tool that needs admin rights
-    // (SeDebugPrivilege) to inject into the running game. We launch it elevated via
-    // a single UAC prompt. The injector remembers the last-used process, so after
-    // the first successful run the user does not need to click anything.
+    // Step 4 – Inject UEVR. UEVRInjector.exe is a GUI tool that needs admin
+    // rights (SeDebugPrivilege) to inject into the running game, AND we want
+    // to skip the manual "select process + click Inject" click.
+    //
+    // Two automations are layered here:
+    //  1. We always pass `--attach=Ace7Game-Win64-Shipping.exe` so the
+    //     injector waits for the running game and auto-injects with no GUI
+    //     interaction (verified in praydog/uevr-frontend MainWindow.xaml.cs).
+    //  2. We prefer triggering a pre-installed Windows Scheduled Task
+    //     (registered during Install & Configure with `RunLevel=Highest`)
+    //     so launching it does NOT trigger a UAC prompt. If the task isn't
+    //     present (fresh install / older user) we fall back to launchElevated
+    //     which preserves the original behavior (one UAC prompt per launch).
     onStep({ id: 'inject', label: 'Inject UEVR mod', status: 'pending' });
     const injectorPath = path.join(this.uevrManagedPath, 'UEVRInjector.exe');
     if (!fs.existsSync(injectorPath)) {
@@ -139,9 +156,17 @@ export class LaunchSequence {
         ERRORS.UEVR_MISSING
       );
     }
+    const attachArgs = [`--attach=${AC7_PROCESS_EXE}`];
+    let usedScheduledTask = false;
     try {
-      await launchElevated(injectorPath, [], this.uevrManagedPath);
-      onLog(`[uevr-injector] launched elevated: ${injectorPath}`);
+      if (taskExists()) {
+        await runInjectorTask();
+        usedScheduledTask = true;
+        onLog(`[uevr-injector] launched via scheduled task (no UAC) with --attach=${AC7_PROCESS_EXE}`);
+      } else {
+        await launchElevated(injectorPath, attachArgs, this.uevrManagedPath);
+        onLog(`[uevr-injector] launched elevated: ${injectorPath} ${attachArgs.join(' ')}`);
+      }
     } catch (err) {
       throw tagError(
         new Error(
@@ -155,9 +180,10 @@ export class LaunchSequence {
       id: 'inject',
       label: 'Inject UEVR mod',
       status: 'ok',
-      message:
-        'UEVR Injector window opened. First-time setup: select "Ace7Game-Win64-Shipping.exe" and click "Inject". '
-        + 'On later launches it auto-injects — no clicks needed.'
+      message: usedScheduledTask
+        ? 'UEVR Injector launched silently and is auto-injecting Ace7Game-Win64-Shipping.exe.'
+        : 'UEVR Injector launched elevated and is auto-injecting Ace7Game-Win64-Shipping.exe. '
+          + 'Tip: re-run Install & Configure to skip the UAC prompt next time.'
     });
 
     // Post-inject crash detector. If AC7 exits inside the early-exit window we

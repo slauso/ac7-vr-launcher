@@ -5,6 +5,7 @@ import path from 'node:path';
 import AdmZip from 'adm-zip';
 import type { UEVRReleaseInfo, UEVRStatus } from '@shared/types';
 import { downloadFile } from '../utils/download';
+import { removeInjectorTask, taskExists } from '../utils/scheduled-task';
 import { BackupManager } from './backup-manager';
 
 interface GitHubRelease {
@@ -83,7 +84,12 @@ export class UEVRManager {
    * Used by the "Reset everything" maintenance action. Returns a list of
    * human-readable bullets describing what was removed.
    */
-  public async resetManagedState(): Promise<{ removedUevr: boolean; removedProfile: boolean; details: string[] }> {
+  public async resetManagedState(): Promise<{
+    removedUevr: boolean;
+    removedProfile: boolean;
+    removedInjectorTask: boolean;
+    details: string[];
+  }> {
     const details: string[] = [];
     let removedUevr = false;
     let removedProfile = false;
@@ -99,7 +105,20 @@ export class UEVRManager {
       details.push(`Removed deployed AC7 profile at ${this.ac7ProfileDir}`);
     }
 
-    return { removedUevr, removedProfile, details };
+    // Best-effort: also drop the elevated injector scheduled task. This may
+    // trigger a UAC prompt because deleting an elevated task is itself an
+    // elevated operation; the user already opted in to "Reset everything".
+    let removedInjectorTask = false;
+    try {
+      removedInjectorTask = await removeInjectorTask();
+      if (removedInjectorTask) {
+        details.push('Removed elevated UEVR injector scheduled task');
+      }
+    } catch (err) {
+      details.push(`Warning: failed to remove injector scheduled task — ${(err as Error).message}`);
+    }
+
+    return { removedUevr, removedProfile, removedInjectorTask, details };
   }
 
   public async getStatus(): Promise<UEVRStatus> {
@@ -111,12 +130,14 @@ export class UEVRManager {
 
     const injectorExists = fs.existsSync(path.join(this.managedPath, 'UEVRInjector.exe'));
     const profileDeployed = fs.existsSync(path.join(this.ac7ProfileDir, 'config.txt'));
+    const injectorTaskRegistered = taskExists();
 
     return {
       installedVersion,
       managedPath: this.managedPath,
       injectorExists,
-      profileDeployed
+      profileDeployed,
+      injectorTaskRegistered
     };
   }
 

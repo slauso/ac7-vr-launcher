@@ -80,6 +80,7 @@ export const buildDiagnosticsReport = async (deps: DiagnosticsDeps): Promise<str
   push('Installed version', uevr.installedVersion);
   push('Injector present', uevr.injectorExists);
   push('AC7 profile deployed', uevr.profileDeployed);
+  push('One-click injector task', uevr.injectorTaskRegistered);
   push('Managed path', redactHome(uevr.managedPath));
 
   // Hash the key DLLs so support can spot a corrupted / tampered UEVR drop.

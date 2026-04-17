@@ -112,6 +112,14 @@ export const ERRORS = {
     message: 'Steam is not installed on this PC.',
     fixAction: 'install-ac7',
     fixActionLabel: 'Install Steam'
+  },
+  INJECT_TASK_MISSING: {
+    code: 'UEVR-005',
+    message:
+      'The elevated UEVR injector scheduled task is not registered. Without it, every Launch VR shows a UAC prompt. '
+      + 'Re-running Install & Configure (or "Install one-click injector") registers it once with a single UAC prompt.',
+    fixAction: 'register-inject-task',
+    fixActionLabel: 'Install one-click injector'
   }
 } as const satisfies Record<string, ErrorEntry>;
 

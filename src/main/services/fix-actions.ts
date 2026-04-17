@@ -1,11 +1,15 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import { shell } from 'electron';
 import type { FixActionId, FixActionResult } from '@shared/types';
+import { registerInjectorTask } from '../utils/scheduled-task';
 import { resolveVirtualDesktopStreamerPath } from '../utils/vd-streamer';
 import { GameConfigService } from './game-config';
 import { ProcessManager } from './process-manager';
 import { SteamDetector } from './steam-detector';
 import { UEVRManager } from './uevr-manager';
+
+const AC7_PROCESS_EXE = 'Ace7Game-Win64-Shipping.exe';
 
 /**
  * Shared AC7 UEVR config asset path. Passed in by the IPC layer so we don't
@@ -119,6 +123,30 @@ export const runFixAction = async (
         ok: true,
         message: 'Click Launch VR again — the launcher will wait an extra 35 seconds before injecting.'
       };
+
+    case 'register-inject-task': {
+      const injectorPath = path.join(deps.uevrManager.managedPath, 'UEVRInjector.exe');
+      if (!fs.existsSync(injectorPath)) {
+        return {
+          ok: false,
+          message: `UEVRInjector.exe missing at ${injectorPath}. Re-install UEVR first.`
+        };
+      }
+      try {
+        await registerInjectorTask(injectorPath, AC7_PROCESS_EXE);
+        return {
+          ok: true,
+          message: 'One-click VR injector installed. Future Launch VR clicks will skip the UAC prompt.'
+        };
+      } catch (err) {
+        return {
+          ok: false,
+          message:
+            `Could not register the injector scheduled task: ${(err as Error).message}. `
+            + 'You can keep using Launch VR; you will see a UAC prompt each time.'
+        };
+      }
+    }
 
     default: {
       const exhaustive: never = action;

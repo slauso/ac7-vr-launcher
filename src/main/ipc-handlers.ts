@@ -23,6 +23,9 @@ import { ProcessManager } from './services/process-manager';
 import { ProfileManager } from './services/profile-manager';
 import { SteamDetector } from './services/steam-detector';
 import { UEVRManager } from './services/uevr-manager';
+import { registerInjectorTask } from './utils/scheduled-task';
+
+const AC7_PROCESS_EXE = 'Ace7Game-Win64-Shipping.exe';
 
 const managedRoot = path.join(os.homedir(), 'AppData', 'Roaming', 'ac7-vr-launcher');
 const settingsPath = path.join(managedRoot, 'settings.json');
@@ -172,6 +175,52 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
         fixActionLabel: 'Reset game settings'
       });
       throw new Error(`Failed to apply game settings: ${message}`);
+    }
+
+    // 4 – Register the elevated UEVR injector scheduled task. This is the
+    // one-time UAC prompt the user pays to skip every per-launch UAC prompt
+    // afterwards. The task bakes in `--attach=Ace7Game-Win64-Shipping.exe`,
+    // so the injector waits for the running game and auto-injects with no
+    // GUI interaction. Failure here is non-fatal: launches will fall back to
+    // the legacy launchElevated() path (one UAC per launch).
+    step({ id: 'inject-task', label: 'Install one-click VR injector', status: 'pending' });
+    const injectorPath = path.join(uevrManager.managedPath, 'UEVRInjector.exe');
+    if (!fs.existsSync(injectorPath)) {
+      step({
+        id: 'inject-task',
+        label: 'Install one-click VR injector',
+        status: 'error',
+        message: `UEVRInjector.exe missing at ${injectorPath} — re-run the UEVR step.`,
+        code: ERRORS.UEVR_MISSING.code,
+        fixAction: ERRORS.UEVR_MISSING.fixAction,
+        fixActionLabel: ERRORS.UEVR_MISSING.fixActionLabel
+      });
+      return;
+    }
+    try {
+      await registerInjectorTask(injectorPath, AC7_PROCESS_EXE);
+      step({
+        id: 'inject-task',
+        label: 'Install one-click VR injector',
+        status: 'ok',
+        message: 'Future Launch VR clicks will skip the UAC prompt.'
+      });
+    } catch (err) {
+      // Most likely cause: user declined the UAC prompt. Surface as a
+      // recoverable warning rather than aborting the whole setup — the
+      // launcher still works, it just shows a UAC prompt per launch.
+      step({
+        id: 'inject-task',
+        label: 'Install one-click VR injector',
+        status: 'error',
+        message:
+          `${(err as Error).message} `
+          + 'Launch VR will still work, but you will see a UAC prompt every time. '
+          + 'Re-run "Install one-click injector" to skip it.',
+        code: ERRORS.INJECT_TASK_MISSING.code,
+        fixAction: ERRORS.INJECT_TASK_MISSING.fixAction,
+        fixActionLabel: ERRORS.INJECT_TASK_MISSING.fixActionLabel
+      });
     }
   });
 
@@ -325,9 +374,10 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
     } catch (err) {
       details.push(`Warning: restore failed — ${(err as Error).message}`);
     }
-    const { removedUevr, removedProfile, details: rmDetails } = await uevrManager.resetManagedState();
+    const { removedUevr, removedProfile, removedInjectorTask, details: rmDetails } =
+      await uevrManager.resetManagedState();
     details.push(...rmDetails);
-    return { removedUevr, removedProfile, restoredIni, details };
+    return { removedUevr, removedProfile, removedInjectorTask, restoredIni, details };
   });
 
   ipcMain.handle('settings:get', () => readSettings());

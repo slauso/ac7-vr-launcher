@@ -57,7 +57,8 @@ export const SettingsStep: React.FC = () => {
       const parts = [
         result.restoredIni ? 'restored backup' : null,
         result.removedUevr ? 'removed UEVR' : null,
-        result.removedProfile ? 'removed profile' : null
+        result.removedProfile ? 'removed profile' : null,
+        result.removedInjectorTask ? 'removed injector task' : null
       ].filter(Boolean);
       setMessage(
         parts.length > 0

@@ -65,10 +65,9 @@ You only have to do Step 3 once. The launcher remembers everything.
    - Start **Virtual Desktop Streamer** on the PC (if it is not already running).
    - Start **Ace Combat 7** through Steam.
    - Wait about 25 seconds for Unreal Engine to finish loading.
-   - Open **UEVR Injector**, which will ask for **Administrator permission** via a Windows UAC prompt — click **Yes**. This is required; UEVR needs admin rights to inject into the game.
-4. **First time only:** the UEVR Injector window will appear. In its process list, click **`Ace7Game-Win64-Shipping.exe`**, then click **Inject**. On every launch after that, UEVR will auto-inject and you will not need to do anything in that window.
-5. Put the Quest 3 on your head, open the **Virtual Desktop** app inside the headset, and connect to your PC.
-6. Ace Combat 7 will appear in VR. Grab your controller/HOTAS and play.
+   - Trigger the elevated **UEVR Injector** scheduled task that was registered during Install &amp; Configure, with `--attach=Ace7Game-Win64-Shipping.exe` baked in. The injector waits for the running game and auto-injects with no UAC prompt and no manual click. (If the scheduled task is missing — e.g. you upgraded from an older launcher — Launch VR falls back to launching the injector elevated, which shows a single UAC prompt; re-run Install &amp; Configure to register the task and skip future prompts.)
+4. Put the Quest 3 on your head, open the **Virtual Desktop** app inside the headset, and connect to your PC.
+5. Ace Combat 7 will appear in VR. Grab your controller/HOTAS and play.
 
 ### When you are done
 
@@ -78,9 +77,9 @@ You only have to do Step 3 once. The launcher remembers everything.
 ### Common first-time problems
 
 - **Windows says "unrecognized app" when running the installer** — click **More info → Run anyway**. The installer is not code-signed yet.
-- **No UAC prompt appears / UEVR does not inject** — the launcher needs Administrator permission to inject. If you blocked the UAC prompt, click Launch again and accept it this time.
+- **No UAC prompt appears / UEVR does not inject** — by default Launch VR uses a pre-registered elevated scheduled task and does **not** show a UAC prompt. If the task is missing the launcher falls back to launching the injector elevated; if you blocked that UAC prompt, click Launch again and accept it. To stop seeing the prompt entirely, re-run Install &amp; Configure (or click **Install one-click injector** in the UEVR step).
 - **"AC7 not found" in Software Detection** — launch Ace Combat 7 once from Steam, let it reach the main menu, quit, then re-run the check.
-- **Game launches but screen stays flat in the headset** — UEVR did not inject. Make sure you clicked **Inject** in the UEVR Injector window the first time (Step 4 point 4), and that you approved the admin prompt.
+- **Game launches but screen stays flat in the headset** — UEVR did not inject. Open the **UEVR** step in the launcher and confirm "One-click VR injector" shows **Yes**; if not, click **Install one-click injector** and accept the UAC prompt once.
 - **Virtual Desktop will not connect** — open Virtual Desktop Streamer on the PC, sign in to the same Meta account you use on the Quest 3, and make sure PC + headset are on the same network.
 - **Stutters / low frame rate** — in the Virtual Desktop headset app, lower the bitrate or resolution; in the launcher's **Game Settings**, lower the game resolution.
 
@@ -118,7 +117,7 @@ npm test
 2. Run **Software Detection** to confirm Steam, AC7, and Virtual Desktop Streamer (PC side) state. SteamVR is **not required** for Quest 3 + Virtual Desktop.
 3. Open **Install Mod** and click **Install & Configure** — downloads UEVR, deploys the AC7 VR profile automatically, and applies recommended game settings.
 4. Adjust optional per-setting toggles in **Game Settings** if needed.
-5. Use **Launch VR** to start Virtual Desktop Streamer → Ace Combat 7 → UEVR injection. After the game process is detected, the launcher waits ~25 seconds for Unreal Engine to finish initializing, then opens the UEVR Injector **with a UAC prompt** (required because DLL injection needs Administrator privileges). The first time, select `Ace7Game-Win64-Shipping.exe` in the injector window and click **Inject** — on subsequent launches UEVR auto-injects with no user action. Then put on your Quest 3 and open the Virtual Desktop app on the headset to connect.
+5. Use **Launch VR** to start Virtual Desktop Streamer → Ace Combat 7 → UEVR injection. After the game process is detected, the launcher waits ~25 seconds for Unreal Engine to finish initializing, then triggers the elevated injector via the pre-registered scheduled task (no UAC prompt) with `--attach=Ace7Game-Win64-Shipping.exe` so it auto-injects with no manual click. (Falls back to launching the injector elevated with one UAC prompt if the task is absent.) Then put on your Quest 3 and open the Virtual Desktop app on the headset to connect.
 6. Configure optional preferences in **Settings & About**.
 
 ## Notes

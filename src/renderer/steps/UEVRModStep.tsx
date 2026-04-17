@@ -105,6 +105,10 @@ export const UEVRModStep: React.FC<{ ac7Path?: string }> = ({ ac7Path }) => {
         <div><span>UEVR installed</span><strong>{status?.injectorExists ? `Yes (${status.installedVersion ?? 'version unknown'})` : 'No'}</strong></div>
         <div><span>AC7 profile deployed</span><strong>{status?.profileDeployed ? 'Yes' : 'No'}</strong></div>
         <div>
+          <span>One-click VR injector</span>
+          <strong>{status?.injectorTaskRegistered ? 'Yes (no UAC needed)' : 'No (UAC prompt per launch)'}</strong>
+        </div>
+        <div>
           <span>Managed path</span>
           <strong className="muted" style={{ fontSize: '11px' }}>{status?.managedPath ?? '-'}</strong>
         </div>

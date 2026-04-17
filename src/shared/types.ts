@@ -15,7 +15,8 @@ export type FixActionId =
   | 'redeploy-profile'
   | 'reset-game-ini'
   | 'rescan-ac7-path'
-  | 'retry-with-extra-warmup';
+  | 'retry-with-extra-warmup'
+  | 'register-inject-task';
 
 export interface StatusItem {
   id: string;
@@ -63,6 +64,12 @@ export interface UEVRStatus {
   injectorExists: boolean;
   /** True when the AC7 UEVR config has been deployed to %APPDATA%\UnrealVR\games\Ace7Game-Win64-Shipping\ */
   profileDeployed: boolean;
+  /**
+   * True when the elevated injector Scheduled Task (`AC7VRLauncher_UEVRInject`)
+   * is registered. When present, Launch VR triggers it via `schtasks /Run` and
+   * skips the per-launch UAC prompt.
+   */
+  injectorTaskRegistered: boolean;
 }
 
 export interface SetupStepStatus {
@@ -121,6 +128,7 @@ export interface FixActionResult {
 export interface ResetResult {
   removedUevr: boolean;
   removedProfile: boolean;
+  removedInjectorTask: boolean;
   restoredIni: boolean;
   details: string[];
 }
