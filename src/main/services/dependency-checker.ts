@@ -1,6 +1,7 @@
 import os from 'node:os';
 import type { DependencyCheckResult, StatusItem } from '@shared/types';
 import { readRegistryValue, registryKeyExists } from '../utils/registry';
+import { ERRORS } from './error-catalog';
 
 export class DependencyChecker {
   public check(): DependencyCheckResult {
@@ -27,7 +28,10 @@ export class DependencyChecker {
         status: vcppInstalled ? 'ok' : 'error',
         details: vcppInstalled ? 'Installed' : 'Missing',
         actionLabel: 'Download',
-        actionUrl: 'https://aka.ms/vs/17/release/vc_redist.x64.exe'
+        actionUrl: 'https://aka.ms/vs/17/release/vc_redist.x64.exe',
+        code: vcppInstalled ? undefined : ERRORS.VCPP_MISSING.code,
+        fixAction: vcppInstalled ? undefined : ERRORS.VCPP_MISSING.fixAction,
+        fixActionLabel: vcppInstalled ? undefined : ERRORS.VCPP_MISSING.fixActionLabel
       },
       {
         id: 'directx',
@@ -35,7 +39,10 @@ export class DependencyChecker {
         status: directxInstalled ? 'ok' : 'error',
         details: directxInstalled ? 'Detected' : 'Not detected',
         actionLabel: 'Download',
-        actionUrl: 'https://www.microsoft.com/en-us/download/details.aspx?id=35'
+        actionUrl: 'https://www.microsoft.com/en-us/download/details.aspx?id=35',
+        code: directxInstalled ? undefined : ERRORS.DIRECTX_MISSING.code,
+        fixAction: directxInstalled ? undefined : ERRORS.DIRECTX_MISSING.fixAction,
+        fixActionLabel: directxInstalled ? undefined : ERRORS.DIRECTX_MISSING.fixActionLabel
       }
     ];
 

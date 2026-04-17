@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import type { SetupStepStatus, UEVRStatus } from '@shared/types';
+import { FixItButton } from '../components/FixItButton';
 import { ProgressBar } from '../components/ProgressBar';
 import { StatusBadge } from '../components/StatusBadge';
 
@@ -9,10 +10,19 @@ export const UEVRModStep: React.FC<{ ac7Path?: string }> = ({ ac7Path }) => {
   const [busy, setBusy] = useState(false);
   const [setupSteps, setSetupSteps] = useState<Record<string, SetupStepStatus>>({});
   const [error, setError] = useState<string | null>(null);
+  const [fixMessage, setFixMessage] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
+  const refreshStatus = async () => {
+    try {
+      setStatus(await window.ac7.getUEVRStatus());
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
   useEffect(() => {
-    void window.ac7.getUEVRStatus().then(setStatus).catch((err) => setError((err as Error).message));
+    void refreshStatus();
     const offProgress = window.ac7.onUEVRProgress(setProgress);
     const offSetup = window.ac7.onSetupProgress((step) =>
       setSetupSteps((prev) => ({ ...prev, [step.id]: step }))
@@ -31,8 +41,7 @@ export const UEVRModStep: React.FC<{ ac7Path?: string }> = ({ ac7Path }) => {
     setProgress(0);
     try {
       await window.ac7.fullSetup(ac7Path);
-      const updated = await window.ac7.getUEVRStatus();
-      setStatus(updated);
+      await refreshStatus();
       setDone(true);
     } catch (err) {
       setError((err as Error).message);
@@ -61,6 +70,7 @@ export const UEVRModStep: React.FC<{ ac7Path?: string }> = ({ ac7Path }) => {
 
       {busy ? <ProgressBar value={progress} /> : null}
       {error ? <p className="error">⚠ {error}</p> : null}
+      {fixMessage ? <p className="muted">{fixMessage}</p> : null}
       {done ? <p className="good">✅ Setup complete — you are ready to launch!</p> : null}
 
       {Object.keys(setupSteps).length > 0 ? (
@@ -69,9 +79,23 @@ export const UEVRModStep: React.FC<{ ac7Path?: string }> = ({ ac7Path }) => {
             <div key={step.id} className="status-row">
               <div>
                 <strong>{step.label}</strong>
+                {step.code ? <span className="error-code"> [{step.code}]</span> : null}
                 {step.message ? <div className="muted">{step.message}</div> : null}
               </div>
-              <StatusBadge status={step.status} />
+              <div className="status-actions">
+                <StatusBadge status={step.status} />
+                {step.status === 'error' && step.fixAction ? (
+                  <FixItButton
+                    action={step.fixAction}
+                    label={step.fixActionLabel}
+                    ac7Path={ac7Path}
+                    onDone={(ok, msg) => {
+                      setFixMessage(msg);
+                      if (ok) void refreshStatus();
+                    }}
+                  />
+                ) : null}
+              </div>
             </div>
           ))}
         </div>

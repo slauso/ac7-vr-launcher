@@ -1,5 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AC7Api, AppSettings, LaunchStepStatus, ProfileSettings, SetupStepStatus } from '@shared/types';
+import type {
+  AC7Api,
+  AppSettings,
+  FixActionId,
+  LaunchStepStatus,
+  ProfileSettings,
+  SetupStepStatus
+} from '@shared/types';
 
 const api: AC7Api = {
   checkDependencies: () => ipcRenderer.invoke('deps:check'),
@@ -13,8 +20,13 @@ const api: AC7Api = {
   importProfile: () => ipcRenderer.invoke('profile:import'),
   exportProfile: () => ipcRenderer.invoke('profile:export'),
   applyGameConfig: (settings: ProfileSettings) => ipcRenderer.invoke('game:applyConfig', settings),
-  launchVR: (ac7Path?: string) => ipcRenderer.invoke('launch:start', ac7Path),
+  launchVR: (ac7Path?: string, options?: { extraWarmup?: boolean }) =>
+    ipcRenderer.invoke('launch:start', ac7Path, options),
   abortLaunch: () => ipcRenderer.invoke('launch:abort'),
+  preflightCheck: (ac7Path?: string) => ipcRenderer.invoke('launch:preflight', ac7Path),
+  runFixAction: (action: FixActionId, ac7Path?: string) => ipcRenderer.invoke('fix:run', action, ac7Path),
+  buildDiagnosticsReport: () => ipcRenderer.invoke('diagnostics:build'),
+  resetEverything: () => ipcRenderer.invoke('maintenance:reset'),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (settings: AppSettings) => ipcRenderer.invoke('settings:save', settings),
   onUEVRProgress: (callback: (percent: number) => void) => {

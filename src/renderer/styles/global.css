@@ -256,3 +256,60 @@ button:disabled {
 .btn-primary:hover {
   background: rgba(0, 212, 255, 0.2);
 }
+
+.btn-fix {
+  background: rgba(255, 184, 73, 0.12);
+  border-color: rgba(255, 184, 73, 0.5);
+  color: #ffd18a;
+  font-weight: 600;
+}
+
+.btn-fix:hover {
+  border-color: #ffb849;
+  background: rgba(255, 184, 73, 0.2);
+}
+
+.btn-danger {
+  background: rgba(224, 67, 67, 0.15);
+  border-color: #ff6a6a;
+  color: #ff8a8a;
+  font-weight: 600;
+}
+
+.btn-danger:hover {
+  background: rgba(224, 67, 67, 0.25);
+}
+
+.error-code {
+  font-family: Consolas, Monaco, monospace;
+  font-size: 11px;
+  color: #ffb849;
+  margin-left: 4px;
+}
+
+.preflight-warning {
+  background: rgba(255, 184, 73, 0.08);
+  border: 1px solid rgba(255, 184, 73, 0.4);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #ffd18a;
+}
+
+.preflight-warning p {
+  margin: 4px 0 8px;
+}
+
+.launch-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(224, 67, 67, 0.08);
+  border: 1px solid rgba(224, 67, 67, 0.35);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.launch-error p {
+  margin: 0;
+  flex: 1;
+}

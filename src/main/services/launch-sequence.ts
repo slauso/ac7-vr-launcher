@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { LaunchStepStatus } from '@shared/types';
 import { launchElevated } from '../utils/elevate';
 import { resolveVirtualDesktopStreamerPath } from '../utils/vd-streamer';
+import { ERRORS } from './error-catalog';
 import { ProcessManager } from './process-manager';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -14,9 +15,38 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * or the mod to silently fail. 25s is a conservative default that works across a wide
  * range of hardware.
  */
-const UE4_WARMUP_SECONDS = 25;
+const UE4_WARMUP_SECONDS_DEFAULT = 25;
+/** Bumped warmup used by the "Retry with extra warmup" fix action. */
+const UE4_WARMUP_SECONDS_EXTRA = 60;
+/**
+ * If the game process disappears within this many seconds of successful
+ * injection we treat it as an early-crash and surface AC7-003 with a
+ * "Retry with extra warmup" button.
+ */
+const AC7_EARLY_EXIT_WINDOW_SECONDS = 60;
+
+/**
+ * Attach an error-catalog entry to a thrown error. The rendered UI reads
+ * `(err as any).code` / `(err as any).fixAction` to offer a one-click remedy.
+ */
+const tagError = (err: Error, entry: typeof ERRORS[keyof typeof ERRORS]): Error => {
+  Object.assign(err, {
+    code: entry.code,
+    fixAction: 'fixAction' in entry ? entry.fixAction : undefined,
+    fixActionLabel: 'fixActionLabel' in entry ? entry.fixActionLabel : undefined
+  });
+  return err;
+};
+
+export interface LaunchOptions {
+  /** Override default UE4 warmup seconds (used by "Retry with extra warmup"). */
+  extraWarmup?: boolean;
+}
 
 export class LaunchSequence {
+  /** Track whether the previous run triggered an early-exit so the UI can offer retry-with-warmup. */
+  private lastEarlyExit = false;
+
   constructor(
     private readonly processManager: ProcessManager,
     private readonly uevrManagedPath: string
@@ -25,8 +55,10 @@ export class LaunchSequence {
   public async run(
     ac7Path: string | undefined,
     onStep: (step: LaunchStepStatus) => void,
-    onLog: (line: string) => void
+    onLog: (line: string) => void,
+    options: LaunchOptions = {}
   ): Promise<void> {
+    const warmupSeconds = options.extraWarmup ? UE4_WARMUP_SECONDS_EXTRA : UE4_WARMUP_SECONDS_DEFAULT;
     // Step 1 – Virtual Desktop Streamer (PC side)
     onStep({ id: 'vd', label: 'Virtual Desktop Streamer (PC)', status: 'pending' });
     if (!this.processManager.isRunning('VirtualDesktop.Streamer.exe')) {
@@ -35,9 +67,12 @@ export class LaunchSequence {
         this.processManager.launch('virtual-desktop', `"${vdPath}"`, [], onLog);
         await sleep(2000);
       } else {
-        throw new Error(
-          'Virtual Desktop Streamer is not installed (or was not found in the registry or standard install locations). '
-          + 'Install it from https://www.vrdesktop.net/ and sign in before continuing.'
+        throw tagError(
+          new Error(
+            'Virtual Desktop Streamer is not installed (or was not found in the registry or standard install locations). '
+            + 'Install it from https://www.vrdesktop.net/ and sign in before continuing.'
+          ),
+          ERRORS.VD_NOT_INSTALLED
         );
       }
     }
@@ -64,14 +99,17 @@ export class LaunchSequence {
       await sleep(2000);
     }
     if (!pid) {
-      throw new Error('Ace Combat 7 process was not detected in time (90s). Make sure the game starts successfully.');
+      throw tagError(
+        new Error('Ace Combat 7 process was not detected in time (90s). Make sure the game starts successfully.'),
+        ERRORS.AC7_NOT_STARTED
+      );
     }
     onStep({ id: 'ac7', label: 'Launch Ace Combat 7', status: 'ok', message: `PID ${pid}` });
 
     // Step 3 – Wait for the Unreal Engine to finish warming up before injecting.
     // Injecting too early causes AC7 to crash. We stream a countdown to the UI so
     // the user sees that the launcher is still working.
-    for (let remaining = UE4_WARMUP_SECONDS; remaining > 0; remaining -= 1) {
+    for (let remaining = warmupSeconds; remaining > 0; remaining -= 1) {
       onStep({
         id: 'warmup',
         label: 'Wait for game to finish loading',
@@ -81,7 +119,10 @@ export class LaunchSequence {
       await sleep(1000);
       // Bail out early if the game crashed / was closed during warmup.
       if (!this.processManager.findPid('Ace7Game-Win64-Shipping.exe')) {
-        throw new Error('Ace Combat 7 exited before UEVR could be injected.');
+        throw tagError(
+          new Error('Ace Combat 7 exited before UEVR could be injected.'),
+          ERRORS.AC7_EARLY_EXIT
+        );
       }
     }
     onStep({ id: 'warmup', label: 'Wait for game to finish loading', status: 'ok' });
@@ -93,15 +134,21 @@ export class LaunchSequence {
     onStep({ id: 'inject', label: 'Inject UEVR mod', status: 'pending' });
     const injectorPath = path.join(this.uevrManagedPath, 'UEVRInjector.exe');
     if (!fs.existsSync(injectorPath)) {
-      throw new Error(`UEVR injector not found at ${injectorPath} — run Install & Configure first.`);
+      throw tagError(
+        new Error(`UEVR injector not found at ${injectorPath} — run Install & Configure first.`),
+        ERRORS.UEVR_MISSING
+      );
     }
     try {
       await launchElevated(injectorPath, [], this.uevrManagedPath);
       onLog(`[uevr-injector] launched elevated: ${injectorPath}`);
     } catch (err) {
-      throw new Error(
-        `Could not launch the UEVR injector with admin rights: ${(err as Error).message}. `
-        + 'Injection requires Administrator privileges. Please accept the UAC prompt next time.'
+      throw tagError(
+        new Error(
+          `Could not launch the UEVR injector with admin rights: ${(err as Error).message}. `
+          + 'Injection requires Administrator privileges. Please accept the UAC prompt next time.'
+        ),
+        ERRORS.UEVR_ELEVATION_REFUSED
       );
     }
     onStep({
@@ -112,6 +159,14 @@ export class LaunchSequence {
         'UEVR Injector window opened. First-time setup: select "Ace7Game-Win64-Shipping.exe" and click "Inject". '
         + 'On later launches it auto-injects — no clicks needed.'
     });
+
+    // Post-inject crash detector. If AC7 exits inside the early-exit window we
+    // flip the `inject` step to an error with AC7-003 + "Retry with extra warmup".
+    // We don't await the full window here — the user is already supposed to
+    // don the headset — but we do kick off a detached watcher that updates
+    // the UI if the game disappears quickly.
+    this.lastEarlyExit = false;
+    void this.watchForEarlyExit(onStep, onLog, pid);
 
     // Step 5 – Prompt the user to connect from their headset
     onStep({
@@ -124,5 +179,37 @@ export class LaunchSequence {
 
   public abort(): void {
     this.processManager.killAll();
+  }
+
+  public get lastAttemptTriggeredEarlyExit(): boolean {
+    return this.lastEarlyExit;
+  }
+
+  /**
+   * Poll for AC7 exit within the early-exit window. Flips the `inject` step
+   * to an error with AC7-003 so the UI can offer "Retry with extra warmup".
+   */
+  private async watchForEarlyExit(
+    onStep: (step: LaunchStepStatus) => void,
+    onLog: (line: string) => void,
+    pid: number
+  ): Promise<void> {
+    for (let elapsed = 0; elapsed < AC7_EARLY_EXIT_WINDOW_SECONDS; elapsed += 2) {
+      await sleep(2000);
+      if (!this.processManager.findPid('Ace7Game-Win64-Shipping.exe')) {
+        this.lastEarlyExit = true;
+        onLog(`[watchdog] Ace7Game (PID ${pid}) exited within ${elapsed}s of inject`);
+        onStep({
+          id: 'inject',
+          label: 'Inject UEVR mod',
+          status: 'error',
+          code: ERRORS.AC7_EARLY_EXIT.code,
+          message: ERRORS.AC7_EARLY_EXIT.message,
+          fixAction: ERRORS.AC7_EARLY_EXIT.fixAction,
+          fixActionLabel: ERRORS.AC7_EARLY_EXIT.fixActionLabel
+        });
+        return;
+      }
+    }
   }
 }

@@ -5,6 +5,7 @@ import path from 'node:path';
 import AdmZip from 'adm-zip';
 import type { UEVRReleaseInfo, UEVRStatus } from '@shared/types';
 import { downloadFile } from '../utils/download';
+import { BackupManager } from './backup-manager';
 
 interface GitHubRelease {
   tag_name: string;
@@ -17,7 +18,7 @@ const UEVR_GAMES_DIR = path.join(os.homedir(), 'AppData', 'Roaming', 'UnrealVR',
 const AC7_PROCESS_NAME = 'Ace7Game-Win64-Shipping';
 
 export class UEVRManager {
-  constructor(private readonly managedRoot: string) {}
+  constructor(private readonly managedRoot: string, private readonly backupManager?: BackupManager) {}
 
   public get managedPath(): string {
     return path.join(this.managedRoot, 'uevr');
@@ -65,7 +66,40 @@ export class UEVRManager {
   public async deployAC7Profile(configSourcePath: string): Promise<void> {
     await fs.promises.mkdir(this.ac7ProfileDir, { recursive: true });
     const destPath = path.join(this.ac7ProfileDir, 'config.txt');
+    // Snapshot any existing deployed config before overwriting so "Reset
+    // everything" / "Undo last setup" can restore it.
+    if (this.backupManager) {
+      try {
+        await this.backupManager.snapshotFile(destPath);
+      } catch {
+        // Non-fatal.
+      }
+    }
     await fs.promises.copyFile(configSourcePath, destPath);
+  }
+
+  /**
+   * Wipe the launcher-managed UEVR install and the deployed AC7 profile.
+   * Used by the "Reset everything" maintenance action. Returns a list of
+   * human-readable bullets describing what was removed.
+   */
+  public async resetManagedState(): Promise<{ removedUevr: boolean; removedProfile: boolean; details: string[] }> {
+    const details: string[] = [];
+    let removedUevr = false;
+    let removedProfile = false;
+
+    if (fs.existsSync(this.managedPath)) {
+      await fs.promises.rm(this.managedPath, { recursive: true, force: true });
+      removedUevr = true;
+      details.push(`Removed UEVR install at ${this.managedPath}`);
+    }
+    if (fs.existsSync(this.ac7ProfileDir)) {
+      await fs.promises.rm(this.ac7ProfileDir, { recursive: true, force: true });
+      removedProfile = true;
+      details.push(`Removed deployed AC7 profile at ${this.ac7ProfileDir}`);
+    }
+
+    return { removedUevr, removedProfile, details };
   }
 
   public async getStatus(): Promise<UEVRStatus> {

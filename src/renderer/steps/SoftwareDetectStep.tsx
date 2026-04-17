@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { SoftwareDetectionResult } from '@shared/types';
+import { FixItButton } from '../components/FixItButton';
 import { PathPicker } from '../components/PathPicker';
 import { StatusBadge } from '../components/StatusBadge';
 
@@ -9,6 +10,7 @@ export const SoftwareDetectStep: React.FC<{
 }> = ({ ac7Path, onAc7Path }) => {
   const [result, setResult] = useState<SoftwareDetectionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fixMessage, setFixMessage] = useState<string | null>(null);
 
   const detect = async () => {
     setError(null);
@@ -35,15 +37,28 @@ export const SoftwareDetectStep: React.FC<{
       </div>
       <PathPicker label="Ace Combat 7 Install Path (auto-detected, or browse)" value={ac7Path} onChange={(value) => onAc7Path(value)} />
       {error ? <p className="error">{error}</p> : null}
+      {fixMessage ? <p className="muted">{fixMessage}</p> : null}
       <div className="status-list">
         {result?.items.map((item) => (
           <div key={item.id} className="status-row">
             <div>
               <strong>{item.label}</strong>
+              {item.code ? <span className="error-code"> [{item.code}]</span> : null}
               {item.details ? <div className="muted">{item.details}</div> : null}
             </div>
             <div className="status-actions">
               <StatusBadge status={item.status} />
+              {item.fixAction ? (
+                <FixItButton
+                  action={item.fixAction}
+                  label={item.fixActionLabel}
+                  ac7Path={ac7Path}
+                  onDone={(ok, msg) => {
+                    setFixMessage(msg);
+                    if (ok) void detect();
+                  }}
+                />
+              ) : null}
               {item.actionUrl ? (
                 <button type="button" onClick={() => void window.ac7.openExternal(item.actionUrl!)}>{item.actionLabel ?? 'Open'}</button>
               ) : null}

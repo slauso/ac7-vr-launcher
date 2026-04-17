@@ -1,5 +1,22 @@
 export type StatusState = 'ok' | 'error' | 'pending' | 'unknown';
 
+/**
+ * Identifier for a one-click remedy the main process knows how to execute.
+ * Rendered as a "Fix it for me" button next to a failed step / item.
+ */
+export type FixActionId =
+  | 'install-vcpp'
+  | 'install-directx'
+  | 'install-virtual-desktop'
+  | 'start-virtual-desktop'
+  | 'start-steam'
+  | 'install-ac7'
+  | 'reinstall-uevr'
+  | 'redeploy-profile'
+  | 'reset-game-ini'
+  | 'rescan-ac7-path'
+  | 'retry-with-extra-warmup';
+
 export interface StatusItem {
   id: string;
   label: string;
@@ -7,6 +24,11 @@ export interface StatusItem {
   details?: string;
   actionLabel?: string;
   actionUrl?: string;
+  /** Structured error code (e.g. `VCPP-001`) so users can search / paste it */
+  code?: string;
+  /** Optional one-click remedy — renders a "Fix it for me" button */
+  fixAction?: FixActionId;
+  fixActionLabel?: string;
 }
 
 export interface DependencyCheckResult {
@@ -48,6 +70,9 @@ export interface SetupStepStatus {
   label: string;
   status: StatusState;
   message?: string;
+  code?: string;
+  fixAction?: FixActionId;
+  fixActionLabel?: string;
 }
 
 export interface ProfileSettings {
@@ -64,6 +89,9 @@ export interface LaunchStepStatus {
   label: string;
   status: StatusState;
   message?: string;
+  code?: string;
+  fixAction?: FixActionId;
+  fixActionLabel?: string;
 }
 
 export interface AppSettings {
@@ -71,6 +99,30 @@ export interface AppSettings {
   defaultAc7Path?: string;
   autoUpdateUEVR: boolean;
   minimizeToTray: boolean;
+}
+
+/**
+ * Machine-readable result of running a preflight check before the launch
+ * sequence. If `ok` is false, the UI surfaces the issue(s) with a
+ * "Fix it for me" button rather than letting the launch fail mid-flight.
+ */
+export interface PreflightResult {
+  ok: boolean;
+  issues: StatusItem[];
+}
+
+/** Result of executing a `FixActionId`. `ok:false` surfaces the reason to the user. */
+export interface FixActionResult {
+  ok: boolean;
+  message: string;
+}
+
+/** Output of the "Reset everything" maintenance action. */
+export interface ResetResult {
+  removedUevr: boolean;
+  removedProfile: boolean;
+  restoredIni: boolean;
+  details: string[];
 }
 
 export interface AC7Api {
@@ -86,8 +138,16 @@ export interface AC7Api {
   importProfile: () => Promise<string | null>;
   exportProfile: () => Promise<string | null>;
   applyGameConfig: (settings: ProfileSettings) => Promise<string>;
-  launchVR: (ac7Path?: string) => Promise<void>;
+  launchVR: (ac7Path?: string, options?: { extraWarmup?: boolean }) => Promise<void>;
   abortLaunch: () => Promise<void>;
+  /** Re-run dependency + software detection, returning structured issues for pre-flight. */
+  preflightCheck: (ac7Path?: string) => Promise<PreflightResult>;
+  /** Execute a one-click remedy by id. */
+  runFixAction: (action: FixActionId, ac7Path?: string) => Promise<FixActionResult>;
+  /** Build a sanitized plain-text diagnostic report ready for clipboard / paste. */
+  buildDiagnosticsReport: () => Promise<string>;
+  /** Undo the launcher's mutations (delete UEVR folder, profile, restore INI backup). */
+  resetEverything: () => Promise<ResetResult>;
   getSettings: () => Promise<AppSettings>;
   saveSettings: (settings: AppSettings) => Promise<void>;
   onUEVRProgress: (callback: (percent: number) => void) => () => void;

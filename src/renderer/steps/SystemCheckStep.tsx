@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { DependencyCheckResult } from '@shared/types';
+import { FixItButton } from '../components/FixItButton';
 import { StatusBadge } from '../components/StatusBadge';
 
 export const SystemCheckStep: React.FC<{
@@ -8,6 +9,7 @@ export const SystemCheckStep: React.FC<{
   const [result, setResult] = useState<DependencyCheckResult | null>(null);
   const [override, setOverride] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fixMessage, setFixMessage] = useState<string | null>(null);
 
   const check = async () => {
     setError(null);
@@ -41,15 +43,27 @@ export const SystemCheckStep: React.FC<{
         </span>
       </div>
       {error ? <p className="error">{error}</p> : null}
+      {fixMessage ? <p className="muted">{fixMessage}</p> : null}
       <div className="status-list">
         {result?.items.map((item) => (
           <div key={item.id} className="status-row">
             <div>
               <strong>{item.label}</strong>
+              {item.code ? <span className="error-code"> [{item.code}]</span> : null}
               {item.details ? <div className="muted">{item.details}</div> : null}
             </div>
             <div className="status-actions">
               <StatusBadge status={item.status} />
+              {item.fixAction ? (
+                <FixItButton
+                  action={item.fixAction}
+                  label={item.fixActionLabel}
+                  onDone={(ok, msg) => {
+                    setFixMessage(msg);
+                    if (ok) void check();
+                  }}
+                />
+              ) : null}
               {item.actionUrl ? (
                 <button type="button" onClick={() => void window.ac7.openExternal(item.actionUrl!)}>
                   {item.actionLabel ?? 'Open'}

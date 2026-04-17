@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { SoftwareDetectionResult, StatusItem } from '@shared/types';
 import { readRegistryValue } from '../utils/registry';
 import { resolveVirtualDesktopStreamerPath } from '../utils/vd-streamer';
+import { ERRORS } from './error-catalog';
 import { ProcessManager } from './process-manager';
 
 const appManifest = (library: string, appId: string) => path.join(library, 'steamapps', `appmanifest_${appId}.acf`);
@@ -60,14 +61,17 @@ export class SteamDetector {
         status: steamInstalled ? 'ok' : 'error',
         details: steamPath ?? 'Not found',
         actionLabel: steamInstalled ? 'Launch' : 'Install',
-        actionUrl: steamInstalled ? 'steam://open/main' : 'https://store.steampowered.com/about/'
+        actionUrl: steamInstalled ? 'steam://open/main' : 'https://store.steampowered.com/about/',
+        code: steamInstalled ? undefined : ERRORS.STEAM_MISSING.code
       },
       {
         id: 'steam-running',
         label: 'Steam running',
         status: steamRunning ? 'ok' : 'pending',
         actionLabel: 'Launch',
-        actionUrl: 'steam://open/main'
+        actionUrl: 'steam://open/main',
+        fixAction: steamRunning ? undefined : 'start-steam',
+        fixActionLabel: steamRunning ? undefined : 'Start Steam'
       },
       {
         // SteamVR is NOT required for Quest 3 + Virtual Desktop. Listed here as info only.
@@ -84,7 +88,10 @@ export class SteamDetector {
         status: ac7Installed ? 'ok' : 'error',
         details: ac7InstallPath ?? 'Not found',
         actionLabel: ac7Installed ? 'Launch' : 'Install',
-        actionUrl: ac7Installed ? 'steam://rungameid/502500' : 'steam://install/502500'
+        actionUrl: ac7Installed ? 'steam://rungameid/502500' : 'steam://install/502500',
+        code: ac7Installed ? undefined : ERRORS.AC7_NOT_DETECTED.code,
+        fixAction: ac7Installed ? undefined : ERRORS.AC7_NOT_DETECTED.fixAction,
+        fixActionLabel: ac7Installed ? undefined : ERRORS.AC7_NOT_DETECTED.fixActionLabel
       },
       {
         // Virtual Desktop Streamer runs on this PC. The Quest 3 headset connects to it.
@@ -97,7 +104,16 @@ export class SteamDetector {
         actionLabel: virtualDesktopInstalled ? 'Launch' : 'Install',
         actionUrl: virtualDesktopInstalled && virtualDesktopInstall
           ? `file:///${virtualDesktopInstall.replace(/\\/g, '/').replace(/ /g, '%20')}`
-          : 'https://www.vrdesktop.net/'
+          : 'https://www.vrdesktop.net/',
+        code: !virtualDesktopInstalled
+          ? ERRORS.VD_NOT_INSTALLED.code
+          : (!virtualDesktopRunning ? ERRORS.VD_NOT_RUNNING.code : undefined),
+        fixAction: !virtualDesktopInstalled
+          ? ERRORS.VD_NOT_INSTALLED.fixAction
+          : (!virtualDesktopRunning ? ERRORS.VD_NOT_RUNNING.fixAction : undefined),
+        fixActionLabel: !virtualDesktopInstalled
+          ? ERRORS.VD_NOT_INSTALLED.fixActionLabel
+          : (!virtualDesktopRunning ? ERRORS.VD_NOT_RUNNING.fixActionLabel : undefined)
       }
     ];
 
