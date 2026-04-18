@@ -18,7 +18,9 @@ export const ProfileConfigStep: React.FC<{ pathOverrides?: PathOverrides }> = ({
   const settingsPath = pathOverrides?.uevrSettingsPath;
 
   useEffect(() => {
-    void window.ac7.getUEVRSettings(settingsPath).then((doc) => setFriendlySettings(doc.items)).catch(() => undefined);
+    void window.ac7.getUEVRSettings(settingsPath).then((doc) => setFriendlySettings(doc.items)).catch((err) => {
+      setError(`Could not load UEVR settings: ${(err as Error).message}`);
+    });
   }, [settingsPath]);
 
   const updateField = <K extends keyof ProfileSettings>(key: K, value: ProfileSettings[K]) => {

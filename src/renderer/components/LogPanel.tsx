@@ -37,7 +37,7 @@ export const LogPanel: React.FC<{ lines: string[] }> = ({ lines }) => {
       <div className="log-panel">
         {filtered.length === 0 ? <div className="log-line muted">No logs for current filter.</div> : null}
         {filtered.map((line, index) => (
-          <div key={`${index}-${line}`} className="log-line">{line}</div>
+          <div key={`${filter}-${index}`} className="log-line">{line}</div>
         ))}
       </div>
     </>

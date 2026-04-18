@@ -42,6 +42,7 @@ const walkFiles = async (dir: string): Promise<string[]> => {
 };
 
 const stripDisabledSuffix = (target: string): string => target.replace(/\.disabled$/i, '');
+const escapeRegex = (input: string): string => input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const detectType = (sourcePath: string, stagedFiles: string[]): ModType => {
   const lowerSource = sourcePath.toLowerCase();
@@ -53,7 +54,11 @@ const detectType = (sourcePath: string, stagedFiles: string[]): ModType => {
   return 'dll';
 };
 
-const safeName = (input: string): string => input.replace(/[^\w.-]+/g, '_');
+const safeName = (input: string): string =>
+  input
+    .replace(/[^\w-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
 
 export class ModManager {
   private readonly modsRoot: string;
@@ -193,7 +198,7 @@ export class ModManager {
       const pakFiles = files.filter((file) => file.toLowerCase().endsWith('.pak'));
       const targets: string[] = [];
       for (const file of pakFiles) {
-        const renamed = `${String(params.order).padStart(3, '0')}_${safeName(path.basename(file))}`;
+        const renamed = `${String(params.order).padStart(4, '0')}_${safeName(path.basename(file))}`;
         const target = path.join(modsDir, renamed);
         await fs.promises.copyFile(file, target);
         targets.push(target);
@@ -224,7 +229,7 @@ export class ModManager {
       const markerEnd = `; AC7VRLauncher Patch ${params.id} END`;
       const existing = fs.existsSync(target) ? await fs.promises.readFile(target, 'utf8') : '';
       const cleaned = existing.replace(
-        new RegExp(`${markerStart}[\\s\\S]*?${markerEnd}\\n?`, 'g'),
+        new RegExp(`${escapeRegex(markerStart)}[\\s\\S]*?${escapeRegex(markerEnd)}\\n?`, 'g'),
         ''
       );
       const merged = `${cleaned.trimEnd()}\n${markerStart}\n${patchText.trim()}\n${markerEnd}\n`;

@@ -5,6 +5,9 @@ import type { UEVRSettingItem, UEVRSettingsDocument } from '@shared/types';
 
 const DEFAULT_DIR = path.join(os.homedir(), 'AppData', 'Roaming', 'UnrealVRMod');
 const PREFERRED_FILES = ['settings.txt', 'config.txt', 'uevr-settings.txt', 'frontend.txt', 'frontend.cfg'];
+// We accept ':' or '=' when reading for compatibility with existing files,
+// but always write "key=value" for consistency.
+const KEY_VALUE_REGEX = /^([^:=\s]+)\s*[:=]\s*(.*)$/;
 
 interface SettingMeta {
   category: string;
@@ -153,7 +156,7 @@ export class UEVRSettingsService {
     for (const raw of text.split(/\r?\n/)) {
       const line = raw.trim();
       if (!line || line.startsWith('#') || line.startsWith(';') || line.startsWith('//')) continue;
-      const match = line.match(/^([^:=\s]+)\s*[:=]\s*(.*)$/);
+      const match = line.match(KEY_VALUE_REGEX);
       if (!match) continue;
       const key = match[1].trim();
       const value = match[2].trim();

@@ -78,6 +78,8 @@ const writeSettings = async (settings: AppSettings): Promise<void> => {
   await fs.promises.writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
 };
 
+const stamp = (): string => new Date().toISOString().replace(/[:.]/g, '-');
+
 const resolveOverrides = async (overrides?: PathOverrides): Promise<PathOverrides> => {
   const settings = await readSettings();
   return { ...(settings.paths ?? {}), ...(overrides ?? {}) };
@@ -106,7 +108,7 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
   ipcMain.handle('dialog:browseModSource', async () => {
     const result = await dialog.showOpenDialog(window, {
       properties: ['openFile', 'openDirectory'],
-      filters: [{ name: 'Mod archive', extensions: ['zip', 'pak', 'ini', 'cfg', 'dll'] }]
+      filters: [{ name: 'Mod files', extensions: ['zip', 'pak', 'ini', 'cfg', 'dll'] }]
     });
     return result.canceled ? null : result.filePaths[0];
   });
@@ -424,7 +426,7 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
   ipcMain.handle('diagnostics:exportBundle', async () => {
     const result = await dialog.showSaveDialog(window, {
       title: 'Export diagnostics bundle',
-      defaultPath: `ac7-vr-diagnostics-${Date.now()}.zip`,
+      defaultPath: `ac7-vr-diagnostics-${stamp()}.zip`,
       filters: [{ name: 'Zip archive', extensions: ['zip'] }]
     });
     if (result.canceled || !result.filePath) return null;
@@ -445,7 +447,7 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
   ipcMain.handle('logs:export', async (_event, lines: string[]) => {
     const result = await dialog.showSaveDialog(window, {
       title: 'Export logs',
-      defaultPath: `ac7-vr-launcher-logs-${Date.now()}.txt`,
+      defaultPath: `ac7-vr-launcher-logs-${stamp()}.txt`,
       filters: [{ name: 'Text', extensions: ['txt', 'log'] }]
     });
     if (result.canceled || !result.filePath) return null;
