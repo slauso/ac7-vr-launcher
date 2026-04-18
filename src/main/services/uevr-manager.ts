@@ -25,6 +25,16 @@ export class UEVRManager {
     return path.join(this.managedRoot, 'uevr');
   }
 
+  public getAutoLocatedPath(): string | undefined {
+    const candidates = [
+      this.managedPath,
+      path.join(os.homedir(), 'Downloads', 'UEVR'),
+      path.join('C:\\', 'UEVR'),
+      path.join('C:\\', 'Program Files', 'UEVR')
+    ];
+    return candidates.find((candidate) => fs.existsSync(path.join(candidate, 'UEVRInjector.exe')));
+  }
+
   public get ac7ProfileDir(): string {
     return path.join(UEVR_GAMES_DIR, AC7_PROCESS_NAME);
   }
@@ -122,23 +132,45 @@ export class UEVRManager {
   }
 
   public async getStatus(): Promise<UEVRStatus> {
-    await fs.promises.mkdir(this.managedPath, { recursive: true });
-    const versionFile = path.join(this.managedPath, 'version.txt');
+    const selectedPath = this.getAutoLocatedPath() ?? this.managedPath;
+    await fs.promises.mkdir(selectedPath, { recursive: true });
+    const versionFile = path.join(selectedPath, 'version.txt');
     const installedVersion = fs.existsSync(versionFile)
       ? (await fs.promises.readFile(versionFile, 'utf8')).trim()
       : undefined;
 
-    const injectorExists = fs.existsSync(path.join(this.managedPath, 'UEVRInjector.exe'));
+    const injectorExists = fs.existsSync(path.join(selectedPath, 'UEVRInjector.exe'));
     const profileDeployed = fs.existsSync(path.join(this.ac7ProfileDir, 'config.txt'));
     const injectorTaskRegistered = taskExists();
 
     return {
       installedVersion,
       managedPath: this.managedPath,
+      selectedPath,
+      autoLocatedPath: this.getAutoLocatedPath(),
       injectorExists,
+      injectionStatus: 'not-running',
       profileDeployed,
       injectorTaskRegistered
     };
+  }
+
+  public async importInstall(sourceDir: string): Promise<void> {
+    const injectorPath = path.join(sourceDir, 'UEVRInjector.exe');
+    if (!fs.existsSync(injectorPath)) {
+      throw new Error('UEVRInjector.exe not found in selected folder.');
+    }
+    await fs.promises.mkdir(this.managedPath, { recursive: true });
+    const entries = await fs.promises.readdir(sourceDir, { withFileTypes: true });
+    for (const entry of entries) {
+      const source = path.join(sourceDir, entry.name);
+      const target = path.join(this.managedPath, entry.name);
+      if (entry.isDirectory()) {
+        await fs.promises.cp(source, target, { recursive: true });
+      } else {
+        await fs.promises.copyFile(source, target);
+      }
+    }
   }
 
   public async update(onProgress: (percent: number) => void): Promise<UEVRStatus> {

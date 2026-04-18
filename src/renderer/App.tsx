@@ -6,6 +6,10 @@ import { UEVRModStep } from './steps/UEVRModStep';
 import { ProfileConfigStep } from './steps/ProfileConfigStep';
 import { LaunchStep } from './steps/LaunchStep';
 import { SettingsStep } from './steps/SettingsStep';
+import { CameraStep } from './steps/CameraStep';
+import { ModsStep } from './steps/ModsStep';
+import { SkinsStep } from './steps/SkinsStep';
+import { OverlaysStep } from './steps/OverlaysStep';
 
 export const App: React.FC = () => {
   const [ac7Path, setAc7Path] = useState<string | undefined>();
@@ -19,10 +23,14 @@ export const App: React.FC = () => {
         canProceed: systemStepReady
       },
       { title: 'Software Detection', content: <SoftwareDetectStep ac7Path={ac7Path} onAc7Path={setAc7Path} /> },
-      { title: 'Install Mod', content: <UEVRModStep ac7Path={ac7Path} /> },
+      { title: 'UEVR', content: <UEVRModStep ac7Path={ac7Path} /> },
+      { title: 'Camera', content: <CameraStep /> },
+      { title: 'Mods', content: <ModsStep /> },
+      { title: 'Skins', content: <SkinsStep /> },
+      { title: 'Overlays', content: <OverlaysStep /> },
       { title: 'Game Settings', content: <ProfileConfigStep /> },
       { title: 'Launch VR', content: <LaunchStep ac7Path={ac7Path} /> },
-      { title: 'Settings & About', content: <SettingsStep /> }
+      { title: 'Settings', content: <SettingsStep /> }
     ],
     [ac7Path, systemStepReady]
   );

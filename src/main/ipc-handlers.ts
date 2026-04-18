@@ -3,14 +3,17 @@ import os from 'node:os';
 import path from 'node:path';
 import { BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
 import type {
+  CameraPreset,
   AppSettings,
   FixActionId,
   LaunchStepStatus,
+  ModEntry,
   PreflightResult,
   ProfileSettings,
   ResetResult,
   SetupStepStatus,
-  StatusItem
+  StatusItem,
+  UEVRRuntimeOptions
 } from '@shared/types';
 import { BackupManager } from './services/backup-manager';
 import { DependencyChecker } from './services/dependency-checker';
@@ -19,10 +22,20 @@ import { ERRORS } from './services/error-catalog';
 import { runFixAction } from './services/fix-actions';
 import { GameConfigService } from './services/game-config';
 import { LaunchSequence } from './services/launch-sequence';
+import {
+  disableModInPath,
+  enableModInPath,
+  installModFromPathToAc7,
+  listModsInPath,
+  uninstallModFromAc7Path
+} from './services/mod-manager';
 import { ProcessManager } from './services/process-manager';
 import { ProfileManager } from './services/profile-manager';
+import { readSettingsFromPath, writeSettingsToPath } from './services/settings-store';
 import { SteamDetector } from './services/steam-detector';
 import { UEVRManager } from './services/uevr-manager';
+import { readCameraPresets, readRuntimeOptions, writeCameraPreset, writeRuntimeOptions } from './services/uevr-profile-config';
+import { launchElevated } from './utils/elevate';
 import { registerInjectorTask } from './utils/scheduled-task';
 
 const AC7_PROCESS_EXE = 'Ace7Game-Win64-Shipping.exe';
@@ -38,7 +51,8 @@ const steamDetector = new SteamDetector(processManager);
 const uevrManager = new UEVRManager(managedRoot, backupManager);
 const profileManager = new ProfileManager(managedRoot, path.resolve(__dirname, '../assets/default-profile.json'));
 const gameConfig = new GameConfigService(backupManager);
-const launchSequence = new LaunchSequence(processManager, uevrManager.managedPath);
+// Lazily created so launches use the latest settings-driven UEVR path.
+let launchSequence: LaunchSequence | null = null;
 
 /**
  * In-memory ring buffer of log lines so the "Copy diagnostic report" button
@@ -51,22 +65,22 @@ const pushLog = (line: string) => {
   if (recentLogs.length > LOG_BUFFER_LIMIT) recentLogs.splice(0, recentLogs.length - LOG_BUFFER_LIMIT);
 };
 
-const defaultSettings: AppSettings = {
-  theme: 'dark-blue',
-  autoUpdateUEVR: true,
-  minimizeToTray: false
+const readSettings = async (): Promise<AppSettings> => readSettingsFromPath(settingsPath);
+const writeSettings = async (settings: AppSettings): Promise<void> => writeSettingsToPath(settingsPath, settings);
+
+const resolveAc7Path = async (): Promise<string> => {
+  const settings = await readSettings();
+  const pathFromSettings = settings.ac7Path ?? settings.defaultAc7Path;
+  if (!pathFromSettings) throw new Error('AC7 path not configured. Set it in Settings.');
+  return pathFromSettings;
 };
 
-const readSettings = async (): Promise<AppSettings> => {
-  if (!fs.existsSync(settingsPath)) return defaultSettings;
-  const parsed = JSON.parse(await fs.promises.readFile(settingsPath, 'utf8')) as Partial<AppSettings>;
-  return { ...defaultSettings, ...parsed };
+const resolveUevrPath = async (): Promise<string> => {
+  const settings = await readSettings();
+  return settings.uevrPath ?? uevrManager.getAutoLocatedPath() ?? uevrManager.managedPath;
 };
 
-const writeSettings = async (settings: AppSettings): Promise<void> => {
-  await fs.promises.mkdir(path.dirname(settingsPath), { recursive: true });
-  await fs.promises.writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
-};
+const resolveModBackupPath = () => path.join(managedRoot, 'backups', 'mods-backup');
 
 export const registerIpcHandlers = (window: BrowserWindow): void => {
   const emit = (channel: string, payload: unknown) => window.webContents.send(channel, payload);
@@ -79,8 +93,54 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
     const result = await dialog.showOpenDialog(window, { properties: ['openDirectory'] });
     return result.canceled ? null : result.filePaths[0];
   });
+  ipcMain.handle('dialog:browseModFile', async () => {
+    const result = await dialog.showOpenDialog(window, {
+      properties: ['openFile'],
+      filters: [{ name: 'Mods', extensions: ['zip', 'pak', 'ucas', 'utoc'] }]
+    });
+    return result.canceled ? null : result.filePaths[0];
+  });
 
-  ipcMain.handle('uevr:status', () => uevrManager.getStatus());
+  ipcMain.handle('uevr:status', async () => {
+    const status = await uevrManager.getStatus();
+    const settings = await readSettings();
+    const selectedPath = settings.uevrPath ?? status.selectedPath;
+    const injectorExists = fs.existsSync(path.join(selectedPath, 'UEVRInjector.exe'));
+    const gameRunning = processManager.isRunning(AC7_PROCESS_EXE);
+    const injectorRunning = processManager.isRunning('UEVRInjector.exe');
+    return {
+      ...status,
+      selectedPath,
+      injectorExists,
+      injectionStatus: !gameRunning ? 'not-running' : injectorRunning ? 'injected' : 'running'
+    };
+  });
+  ipcMain.handle('uevr:inject', async () => {
+    if (!processManager.isRunning(AC7_PROCESS_EXE)) {
+      throw new Error('Ace Combat 7 is not running. Start the game first, then inject UEVR.');
+    }
+    const uevrPath = await resolveUevrPath();
+    const injectorPath = path.join(uevrPath, 'UEVRInjector.exe');
+    if (!fs.existsSync(injectorPath)) throw new Error(`UEVRInjector.exe missing at ${injectorPath}`);
+    await launchElevated(injectorPath, [`--attach=${AC7_PROCESS_EXE}`], uevrPath);
+  });
+  ipcMain.handle('uevr:importFolder', async () => {
+    const result = await dialog.showOpenDialog(window, { properties: ['openDirectory'] });
+    if (result.canceled || !result.filePaths[0]) return null;
+    await uevrManager.importInstall(result.filePaths[0]);
+    const settings = await readSettings();
+    await writeSettings({ ...settings, uevrPath: uevrManager.managedPath });
+    return uevrManager.managedPath;
+  });
+  ipcMain.handle('uevr:deployProfile', async () => {
+    if (!fs.existsSync(uevrCfgAsset)) throw new Error(`Config asset not found at ${uevrCfgAsset}`);
+    await uevrManager.deployAC7Profile(uevrCfgAsset);
+  });
+  ipcMain.handle('uevr:runtimeOptions:get', async (): Promise<UEVRRuntimeOptions> => readRuntimeOptions(uevrManager.ac7ProfileDir));
+  ipcMain.handle('uevr:runtimeOptions:set', async (_event, options: UEVRRuntimeOptions) =>
+    writeRuntimeOptions(uevrManager.ac7ProfileDir, options)
+  );
+
   ipcMain.handle('uevr:update', async () => {
     return uevrManager.update((percent) => emit('uevr:progress', percent));
   });
@@ -248,6 +308,7 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
 
   ipcMain.handle('launch:start', async (_event, ac7Path?: string, options?: { extraWarmup?: boolean }) => {
     try {
+      launchSequence = new LaunchSequence(processManager, await resolveUevrPath());
       await launchSequence.run(
         ac7Path,
         (step) => {
@@ -281,7 +342,7 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
     }
   });
 
-  ipcMain.handle('launch:abort', () => launchSequence.abort());
+  ipcMain.handle('launch:abort', () => launchSequence?.abort());
 
   /**
    * Pre-flight verification run before Launch VR. We re-run cheap detection
@@ -380,6 +441,69 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
     return { removedUevr, removedProfile, removedInjectorTask, restoredIni, details };
   });
 
+  ipcMain.handle('camera:getPresets', async (): Promise<CameraPreset[]> => readCameraPresets(uevrManager.ac7ProfileDir));
+  ipcMain.handle('camera:setPreset', async (_event, preset: CameraPreset) => writeCameraPreset(uevrManager.ac7ProfileDir, preset));
+
+  ipcMain.handle('mods:list', async (): Promise<ModEntry[]> => {
+    const ac7Path = await resolveAc7Path();
+    return listModsInPath(ac7Path);
+  });
+  ipcMain.handle('mods:enable', async (_event, fileName: string) => {
+    const ac7Path = await resolveAc7Path();
+    await enableModInPath(ac7Path, fileName);
+  });
+  ipcMain.handle('mods:disable', async (_event, fileName: string) => {
+    const ac7Path = await resolveAc7Path();
+    await disableModInPath(ac7Path, fileName);
+  });
+  ipcMain.handle('mods:install', async (_event, sourcePath: string) => {
+    const ac7Path = await resolveAc7Path();
+    await installModFromPathToAc7(ac7Path, sourcePath);
+  });
+  ipcMain.handle('mods:uninstall', async (_event, fileName: string) => {
+    const ac7Path = await resolveAc7Path();
+    await uninstallModFromAc7Path(ac7Path, fileName);
+  });
+
+  ipcMain.handle('backup:create', async () => {
+    const ac7Path = await resolveAc7Path();
+    const backupRoot = resolveModBackupPath();
+    const modsPath = path.join(ac7Path, 'Game', 'Content', 'Paks');
+    await fs.promises.rm(backupRoot, { recursive: true, force: true });
+    if (fs.existsSync(modsPath)) {
+      await fs.promises.mkdir(backupRoot, { recursive: true });
+      await fs.promises.cp(modsPath, path.join(backupRoot, 'Paks'), { recursive: true });
+    }
+    if (fs.existsSync(uevrManager.ac7ProfileDir)) {
+      await fs.promises.cp(uevrManager.ac7ProfileDir, path.join(backupRoot, 'UEVRProfile'), { recursive: true });
+    }
+  });
+  ipcMain.handle('backup:restore', async () => {
+    const ac7Path = await resolveAc7Path();
+    const backupRoot = resolveModBackupPath();
+    const modsBackup = path.join(backupRoot, 'Paks');
+    const profileBackup = path.join(backupRoot, 'UEVRProfile');
+    if (!fs.existsSync(modsBackup) && !fs.existsSync(profileBackup)) {
+      throw new Error('No backup exists yet.');
+    }
+    if (fs.existsSync(modsBackup)) {
+      const modsPath = path.join(ac7Path, 'Game', 'Content', 'Paks');
+      await fs.promises.rm(modsPath, { recursive: true, force: true });
+      await fs.promises.cp(modsBackup, modsPath, { recursive: true });
+    }
+    if (fs.existsSync(profileBackup)) {
+      await fs.promises.rm(uevrManager.ac7ProfileDir, { recursive: true, force: true });
+      await fs.promises.cp(profileBackup, uevrManager.ac7ProfileDir, { recursive: true });
+    }
+  });
+
   ipcMain.handle('settings:get', () => readSettings());
-  ipcMain.handle('settings:save', async (_event, settings: AppSettings) => writeSettings(settings));
+  ipcMain.handle('settings:save', async (_event, settings: AppSettings) => {
+    const normalized = {
+      ...settings,
+      ac7Path: settings.ac7Path ?? settings.defaultAc7Path,
+      defaultAc7Path: settings.ac7Path ?? settings.defaultAc7Path
+    };
+    await writeSettings(normalized);
+  });
 };
