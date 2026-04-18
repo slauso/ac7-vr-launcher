@@ -45,7 +45,7 @@ export const SkinsStep: React.FC = () => {
               {skins.map((skin) => (
                 <div key={skin.fullPath}>
                   <span>{skin.fileName}</span>
-                  {skin.thumbnailPath ? <div><img src={`file://${skin.thumbnailPath}`} alt={skin.fileName} style={{ width: 96, borderRadius: 6 }} /></div> : null}
+                  {skin.thumbnailPath ? <div><img src={`file://${skin.thumbnailPath}`} alt={`${aircraft} skin preview: ${skin.fileName}`} style={{ width: 96, borderRadius: 6 }} /></div> : null}
                 </div>
               ))}
             </div>

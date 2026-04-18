@@ -20,8 +20,12 @@ export const SettingsStep: React.FC = () => {
   }, []);
 
   const save = async () => {
-    await window.ac7.writeSettings(settings);
-    setMessage('Settings saved');
+    try {
+      await window.ac7.writeSettings(settings);
+      setMessage('Settings saved');
+    } catch (err) {
+      setMessage(`Failed to save settings: ${(err as Error).message}`);
+    }
   };
 
   /**
@@ -83,8 +87,8 @@ export const SettingsStep: React.FC = () => {
         <label>
           AC7 path
           <div className="path-row">
-            <input value={settings.ac7Path ?? ''} onChange={(event) => setSettings((prev) => ({ ...prev, ac7Path: event.target.value, defaultAc7Path: event.target.value }))} />
-            <button type="button" onClick={() => void window.ac7.browseForFolder().then((folder) => folder && setSettings((prev) => ({ ...prev, ac7Path: folder, defaultAc7Path: folder })))}>Browse</button>
+            <input value={settings.ac7Path ?? ''} onChange={(event) => setSettings((prev) => ({ ...prev, ac7Path: event.target.value }))} />
+            <button type="button" onClick={() => void window.ac7.browseForFolder().then((folder) => folder && setSettings((prev) => ({ ...prev, ac7Path: folder })))}>Browse</button>
           </div>
         </label>
         <label>

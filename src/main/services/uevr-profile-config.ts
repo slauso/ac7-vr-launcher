@@ -99,6 +99,9 @@ export const readCameraPresets = async (profileDir: string): Promise<CameraPrese
 export const writeCameraPreset = async (profileDir: string, preset: CameraPreset): Promise<void> => {
   const all = await readCameraPresets(profileDir);
   const next = [...all.filter((item) => item.id !== preset.id), preset];
+  // cameras.json is the editable source-of-truth for launcher UI presets.
+  // cameras.txt mirrors the same data in a line format for compatibility with
+  // existing UEVR profile tooling that expects text-based camera entries.
   await fs.promises.writeFile(path.join(profileDir, camerasFileName), `${JSON.stringify(next, null, 2)}\n`, 'utf8');
   await fs.promises.writeFile(path.join(profileDir, 'cameras.txt'), serializeCameraPresets(next), 'utf8');
 };

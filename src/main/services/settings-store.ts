@@ -13,6 +13,8 @@ export const defaultSettings: AppSettings = {
 };
 
 const migrateSettings = (parsed: Partial<AppSettings>): AppSettings => {
+  // Backward compatibility: older settings only had `defaultAc7Path`.
+  // We promote it to `ac7Path` while still writing both keys.
   const ac7Path = parsed.ac7Path ?? parsed.defaultAc7Path;
   return { ...defaultSettings, ...parsed, ac7Path, defaultAc7Path: ac7Path };
 };

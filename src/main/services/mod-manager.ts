@@ -3,7 +3,11 @@ import path from 'node:path';
 import AdmZip from 'adm-zip';
 import type { ModEntry } from '@shared/types';
 
+// Actual Unreal mod payload files toggled between ~mods and ~mods_disabled.
 const MOD_FILE_EXTENSIONS = new Set(['.pak', '.ucas', '.utoc']);
+// Optional sidecars accepted during install (metadata + previews).
+const IMPORTABLE_AUX_EXTENSIONS = new Set(['.json', '.png']);
+const MOD_SIDECAR_SUFFIXES = ['.json', '.preview.png'];
 
 interface ModMeta {
   description?: string;
@@ -56,13 +60,12 @@ const isModFile = (filePath: string) => MOD_FILE_EXTENSIONS.has(path.extname(fil
 
 const moveModFileSet = async (sourceRoot: string, destinationRoot: string, fileName: string): Promise<void> => {
   const source = path.join(sourceRoot, fileName);
-  if (!fs.existsSync(source)) throw new Error(`Mod file not found: ${fileName}`);
+  if (!fs.existsSync(source)) throw new Error(`Mod file not found: ${source}`);
   await fs.promises.mkdir(destinationRoot, { recursive: true });
   await fs.promises.rename(source, path.join(destinationRoot, fileName));
-  const sidecars = ['.json', '.preview.png'];
   const ext = path.extname(fileName);
   const stem = fileName.slice(0, fileName.length - ext.length);
-  for (const suffix of sidecars) {
+  for (const suffix of MOD_SIDECAR_SUFFIXES) {
     const sidecar = path.join(sourceRoot, `${stem}${suffix}`);
     if (fs.existsSync(sidecar)) {
       await fs.promises.rename(sidecar, path.join(destinationRoot, `${stem}${suffix}`));
@@ -99,7 +102,7 @@ export const installModFromPathToAc7 = async (ac7Path: string, sourcePath: strin
     for (const entry of entries) {
       if (entry.isDirectory) continue;
       const entryExt = path.extname(entry.entryName).toLowerCase();
-      if (!['.pak', '.ucas', '.utoc', '.json', '.png'].includes(entryExt)) continue;
+      if (!MOD_FILE_EXTENSIONS.has(entryExt) && !IMPORTABLE_AUX_EXTENSIONS.has(entryExt)) continue;
       const dest = path.join(targetDir, path.basename(entry.entryName));
       await fs.promises.writeFile(dest, entry.getData());
     }
@@ -123,8 +126,7 @@ export const uninstallModFromAc7Path = async (ac7Path: string, fileName: string)
       await fs.promises.rm(target, { force: true });
       const ext = path.extname(fileName);
       const stem = fileName.slice(0, fileName.length - ext.length);
-      await fs.promises.rm(path.join(root, `${stem}.json`), { force: true });
-      await fs.promises.rm(path.join(root, `${stem}.preview.png`), { force: true });
+      await Promise.all(MOD_SIDECAR_SUFFIXES.map((suffix) => fs.promises.rm(path.join(root, `${stem}${suffix}`), { force: true })));
       return;
     }
   }

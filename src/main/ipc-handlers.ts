@@ -51,7 +51,8 @@ const steamDetector = new SteamDetector(processManager);
 const uevrManager = new UEVRManager(managedRoot, backupManager);
 const profileManager = new ProfileManager(managedRoot, path.resolve(__dirname, '../assets/default-profile.json'));
 const gameConfig = new GameConfigService(backupManager);
-let launchSequence = new LaunchSequence(processManager, uevrManager.managedPath);
+// Lazily created so launches use the latest settings-driven UEVR path.
+let launchSequence: LaunchSequence | null = null;
 
 /**
  * In-memory ring buffer of log lines so the "Copy diagnostic report" button
@@ -115,6 +116,9 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
     };
   });
   ipcMain.handle('uevr:inject', async () => {
+    if (!processManager.isRunning(AC7_PROCESS_EXE)) {
+      throw new Error('Ace Combat 7 is not running. Start the game first, then inject UEVR.');
+    }
     const uevrPath = await resolveUevrPath();
     const injectorPath = path.join(uevrPath, 'UEVRInjector.exe');
     if (!fs.existsSync(injectorPath)) throw new Error(`UEVRInjector.exe missing at ${injectorPath}`);
@@ -338,7 +342,7 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
     }
   });
 
-  ipcMain.handle('launch:abort', () => launchSequence.abort());
+  ipcMain.handle('launch:abort', () => launchSequence?.abort());
 
   /**
    * Pre-flight verification run before Launch VR. We re-run cheap detection

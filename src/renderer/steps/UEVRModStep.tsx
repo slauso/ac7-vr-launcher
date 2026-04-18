@@ -68,10 +68,10 @@ export const UEVRModStep: React.FC<{ ac7Path?: string }> = ({ ac7Path }) => {
         <button type="button" disabled={busy} onClick={runSetup} className="btn-primary">
           {alreadyInstalled ? '↺ Re-install & Reconfigure' : '⬇ Install & Configure'}
         </button>
-        <button type="button" onClick={() => void window.ac7.injectUEVR().then(refreshStatus)}>Inject UEVR now</button>
-        <button type="button" onClick={() => void window.ac7.importUEVRFolder().then(refreshStatus)}>Import UEVR folder</button>
-        <button type="button" onClick={() => void window.ac7.deployUEVRProfile().then(refreshStatus)}>Deploy AC7 profile</button>
-        <button type="button" onClick={() => void window.ac7.openExternal('https://github.com/praydog/UEVR/releases/latest')}>Download UEVR</button>
+        <button type="button" aria-label="Inject UEVR into running Ace Combat 7 process" onClick={() => void window.ac7.injectUEVR().then(refreshStatus).catch((err) => setError((err as Error).message))}>Inject UEVR now</button>
+        <button type="button" aria-label="Import an existing UEVR installation folder" onClick={() => void window.ac7.importUEVRFolder().then(refreshStatus).catch((err) => setError((err as Error).message))}>Import UEVR folder</button>
+        <button type="button" aria-label="Deploy the Ace Combat 7 UEVR profile into UnrealVR games folder" onClick={() => void window.ac7.deployUEVRProfile().then(refreshStatus).catch((err) => setError((err as Error).message))}>Deploy AC7 profile</button>
+        <button type="button" aria-label="Open official UEVR latest release page" onClick={() => void window.ac7.openExternal('https://github.com/praydog/UEVR/releases/latest')}>Download UEVR</button>
       </div>
 
       {busy ? <ProgressBar value={progress} /> : null}
