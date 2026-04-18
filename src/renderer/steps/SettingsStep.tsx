@@ -5,7 +5,8 @@ export const SettingsStep: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>({
     theme: 'dark-blue',
     autoUpdateUEVR: true,
-    minimizeToTray: false
+    minimizeToTray: false,
+    paths: {}
   });
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -105,6 +106,15 @@ export const SettingsStep: React.FC = () => {
       <div className="toolbar">
         <button type="button" disabled={busy} onClick={() => void copyDiagnostics()}>
           📋 Copy diagnostic report
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void window.ac7.exportDiagnosticsBundle().then((output) => {
+            if (output) setMessage(`Diagnostics bundle exported: ${output}`);
+          })}
+        >
+          🧰 Export diagnostics bundle (.zip)
         </button>
         {confirmReset ? (
           <>

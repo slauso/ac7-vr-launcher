@@ -15,7 +15,7 @@ export const StepIndicator: React.FC<{
           className={`step-pill ${index === current ? 'active' : ''}`}
           onClick={() => onSelect(index)}
         >
-          {index + 1}. {titles[index]}
+          <span>{index < current ? '✓' : index + 1}.</span> {titles[index]}
         </button>
       ))}
     </div>

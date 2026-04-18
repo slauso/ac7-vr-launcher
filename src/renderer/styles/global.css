@@ -38,7 +38,13 @@ body {
   border: 1px solid #23374e;
   border-radius: 10px;
   box-shadow: 0 0 18px rgba(0, 212, 255, 0.1);
-  padding: 20px;
+  padding: 22px;
+}
+
+.wizard-card h2 {
+  margin-top: 0;
+  margin-bottom: 14px;
+  font-size: 22px;
 }
 
 .wizard-nav {
@@ -55,15 +61,22 @@ body {
 }
 
 .step-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
   border: 1px solid #2a3b53;
   background: #111827;
   color: #b9d8e8;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .step-pill.active {
   border-color: #00d4ff;
   color: #00d4ff;
   box-shadow: 0 0 8px rgba(0, 212, 255, 0.25);
+  background: rgba(0, 212, 255, 0.09);
 }
 
 .step-body {
@@ -128,30 +141,35 @@ button:disabled {
 }
 
 .status-badge {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   padding: 4px 8px;
   border-radius: 999px;
+  border: 1px solid transparent;
 }
 
 .status-ok {
   background: rgba(28, 201, 126, 0.18);
   color: #82f5bf;
+  border-color: rgba(130, 245, 191, 0.35);
 }
 
 .status-error {
   background: rgba(224, 67, 67, 0.2);
   color: #ff8a8a;
+  border-color: rgba(255, 138, 138, 0.35);
 }
 
 .status-pending {
   background: rgba(255, 184, 73, 0.2);
   color: #ffd18a;
+  border-color: rgba(255, 209, 138, 0.35);
 }
 
 .status-unknown {
   background: rgba(130, 152, 175, 0.2);
   color: #d2dde8;
+  border-color: rgba(210, 221, 232, 0.35);
 }
 
 .progress-wrap {

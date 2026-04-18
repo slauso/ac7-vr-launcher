@@ -7,10 +7,13 @@ AC7 VR Launcher is a Windows-focused Electron + TypeScript wizard that automates
 - Multi-step setup wizard with individual controls per stage
 - System dependency checks (Windows version, VC++ Runtime, DirectX)
 - Steam / SteamVR / AC7 / Virtual Desktop detection with launch/install links
+- Paths & Overrides step for manual dependency paths (Steam, SteamVR, AC7, VD, UEVR, mods folders)
 - UEVR manager that fetches latest release from GitHub and installs it
+- Friendly UEVR settings editor (grouped categories, advanced/raw mode, import/export)
+- Mods Library for PAK mods, loader/DLL mods, and config patches (enable/disable/uninstall/order)
 - Profile and game configuration tools (borderless mode, motion blur off, resolution)
 - One-click launch sequence with real-time status updates and logs
-- Settings + about panel with useful links
+- Settings + diagnostics export (zip bundle with settings/logs/mods manifest)
 - Dark aviation-themed UI
 
 ## Install & Use — Quest 3 + Virtual Desktop + Steam AC7 (Non-Technical Guide)
@@ -145,13 +148,22 @@ npm test
 
 1. Open **System Check** and verify required dependencies.
 2. Run **Software Detection** to confirm Steam, AC7, and Virtual Desktop Streamer (PC side) state. SteamVR is **not required** for Quest 3 + Virtual Desktop.
-3. Open **Install Mod** and click **Install & Configure** — downloads UEVR, deploys the AC7 VR profile automatically, and applies recommended game settings.
-4. Adjust optional per-setting toggles in **Game Settings** if needed.
-5. Use **Launch VR** to start Virtual Desktop Streamer → Ace Combat 7 → UEVR injection. After the game process is detected, the launcher waits ~25 seconds for Unreal Engine to finish initializing, then triggers the elevated injector via the pre-registered scheduled task (no UAC prompt) with `--attach=Ace7Game-Win64-Shipping.exe` so it auto-injects with no manual click. (Falls back to launching the injector elevated with one UAC prompt if the task is absent.) Then put on your Quest 3 and open the Virtual Desktop app on the headset to connect.
-6. Configure optional preferences in **Settings & About**.
+3. Use **Paths & Overrides** if auto-detection missed any dependency path.
+4. Open **Install Mod** and click **Install & Configure** — downloads UEVR, deploys the AC7 VR profile automatically, and applies recommended game settings.
+5. Adjust settings in **Game Settings** (includes friendly UEVR config editing with advanced/raw toggle and import/export).
+6. Use **Mods Library** to add zip/folder mods, toggle enabled state, uninstall, and control load priority.
+7. Use **Launch VR** to start Virtual Desktop Streamer → Ace Combat 7 → UEVR injection. After the game process is detected, the launcher waits ~25 seconds for Unreal Engine to finish initializing, then triggers the elevated injector via the pre-registered scheduled task (no UAC prompt) with `--attach=Ace7Game-Win64-Shipping.exe` so it auto-injects with no manual click. (Falls back to launching the injector elevated with one UAC prompt if the task is absent.) Then put on your Quest 3 and open the Virtual Desktop app on the headset to connect.
+8. Configure optional preferences in **Settings & About**.
 
 ## Notes
 
 - Windows x64 is the only supported platform target.
 - Registry and process checks rely on Windows shell tooling (`reg query`, `tasklist`).
 - SteamVR is **not** part of the Quest 3 + Virtual Desktop flow and is not started by the launcher.
+
+## Stored Files
+
+- `%APPDATA%\ac7-vr-launcher\settings.json` — launcher settings + path overrides
+- `%APPDATA%\ac7-vr-launcher\mods.json` — installed mods manifest and ordering
+- `%APPDATA%\ac7-vr-launcher\mods\` — staged mod payloads
+- `%APPDATA%\UnrealVRMod\` — UEVR frontend settings edited in Friendly Mode
