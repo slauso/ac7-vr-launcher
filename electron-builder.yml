@@ -1,0 +1,33 @@
+appId: com.slauso.ac7vrlauncher
+productName: AC7 VR Launcher
+directories:
+  output: release
+files:
+  - dist/**/*
+  - package.json
+  - src/assets/icon.png
+extraResources:
+  - from: src/assets/default-profile.json
+    to: assets/default-profile.json
+win:
+  target:
+    - nsis
+  icon: src/assets/icon.png
+  artifactName: AC7-VR-Launcher-${version}-Setup.${ext}
+nsis:
+  # `oneClick: false` produces a guided wizard (license/path/finish pages).
+  # We pair it with `perMachine: false` so the installer never needs admin
+  # rights on the gaming PC — UEVR injection still gets elevated separately
+  # via the `AC7VRLauncher_UEVRInject` scheduled task registered at first run.
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  menuCategory: "Games"
+  shortcutName: "AC7 VR Launcher"
+  uninstallDisplayName: "AC7 VR Launcher ${version}"
+  # Offer to launch the wizard right after install so the user can finish
+  # the one-click setup (download UEVR, deploy AC7 profile, register the
+  # injector task) without hunting for the Start-Menu icon.
+  runAfterFinish: true
