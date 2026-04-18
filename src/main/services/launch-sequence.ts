@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { LaunchStepStatus } from '@shared/types';
+import type { LaunchStepStatus, PathOverrides } from '@shared/types';
 import { launchElevated } from '../utils/elevate';
 import { runInjectorTask, taskExists } from '../utils/scheduled-task';
 import { resolveVirtualDesktopStreamerPath } from '../utils/vd-streamer';
@@ -49,6 +49,7 @@ const tagError = (err: Error, entry: typeof ERRORS[keyof typeof ERRORS]): Error 
 export interface LaunchOptions {
   /** Override default UE4 warmup seconds (used by "Retry with extra warmup"). */
   extraWarmup?: boolean;
+  overrides?: PathOverrides;
 }
 
 export class LaunchSequence {
@@ -70,7 +71,7 @@ export class LaunchSequence {
     // Step 1 – Virtual Desktop Streamer (PC side)
     onStep({ id: 'vd', label: 'Virtual Desktop Streamer (PC)', status: 'pending' });
     if (!this.processManager.isRunning('VirtualDesktop.Streamer.exe')) {
-      const vdPath = resolveVirtualDesktopStreamerPath();
+      const vdPath = options.overrides?.virtualDesktopPath || resolveVirtualDesktopStreamerPath();
       if (vdPath) {
         this.processManager.launch('virtual-desktop', `"${vdPath}"`, [], onLog);
         await sleep(2000);
@@ -88,8 +89,9 @@ export class LaunchSequence {
 
     // Step 2 – Launch Ace Combat 7
     onStep({ id: 'ac7', label: 'Launch Ace Combat 7', status: 'pending' });
-    if (ac7Path && fs.existsSync(ac7Path)) {
-      const binary = path.join(ac7Path, 'Game', 'Binaries', 'Win64', 'Ace7Game-Win64-Shipping.exe');
+    const resolvedAc7Path = options.overrides?.ac7InstallPath || ac7Path;
+    if (resolvedAc7Path && fs.existsSync(resolvedAc7Path)) {
+      const binary = path.join(resolvedAc7Path, 'Game', 'Binaries', 'Win64', 'Ace7Game-Win64-Shipping.exe');
       if (fs.existsSync(binary)) {
         this.processManager.launch('ac7', `"${binary}"`, [], onLog);
       } else {
@@ -149,7 +151,7 @@ export class LaunchSequence {
     //     present (fresh install / older user) we fall back to launchElevated
     //     which preserves the original behavior (one UAC prompt per launch).
     onStep({ id: 'inject', label: 'Inject UEVR mod', status: 'pending' });
-    const injectorPath = path.join(this.uevrManagedPath, 'UEVRInjector.exe');
+    const injectorPath = options.overrides?.uevrInjectorPath || path.join(this.uevrManagedPath, 'UEVRInjector.exe');
     if (!fs.existsSync(injectorPath)) {
       throw tagError(
         new Error(`UEVR injector not found at ${injectorPath} — run Install & Configure first.`),

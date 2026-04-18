@@ -51,6 +51,17 @@ export interface SoftwareDetectionResult {
   items: StatusItem[];
 }
 
+export interface PathOverrides {
+  steamExePath?: string;
+  steamVRPath?: string;
+  ac7InstallPath?: string;
+  virtualDesktopPath?: string;
+  uevrInjectorPath?: string;
+  uevrSettingsPath?: string;
+  ac7ModsPath?: string;
+  ac7LoaderPath?: string;
+}
+
 export interface UEVRReleaseInfo {
   version: string;
   downloadUrl: string;
@@ -106,6 +117,7 @@ export interface AppSettings {
   defaultAc7Path?: string;
   autoUpdateUEVR: boolean;
   minimizeToTray: boolean;
+  paths: PathOverrides;
 }
 
 /**
@@ -133,31 +145,87 @@ export interface ResetResult {
   details: string[];
 }
 
+export interface UEVRSettingItem {
+  key: string;
+  value: string;
+  category: string;
+  label: string;
+  description: string;
+  known: boolean;
+}
+
+export interface UEVRSettingsDocument {
+  settingsDir: string;
+  settingsFile: string;
+  items: UEVRSettingItem[];
+}
+
+export type ModType = 'pak' | 'dll' | 'config';
+
+export interface ModRecord {
+  id: string;
+  name: string;
+  type: ModType;
+  enabled: boolean;
+  version?: string;
+  source: string;
+  installTargets: string[];
+  order: number;
+  installedAt: string;
+}
+
+export interface AddModRequest {
+  sourcePath: string;
+  name?: string;
+  type?: ModType;
+  ac7Path?: string;
+  modsDir?: string;
+  loaderDir?: string;
+}
+
+export interface AddModResult {
+  added: ModRecord;
+  mods: ModRecord[];
+}
+
 export interface AC7Api {
   checkDependencies: () => Promise<DependencyCheckResult>;
-  detectSoftware: (manualPath?: string) => Promise<SoftwareDetectionResult>;
+  detectSoftware: (manualPath?: string, overrides?: PathOverrides) => Promise<SoftwareDetectionResult>;
   openExternal: (url: string) => Promise<void>;
   browseForFolder: () => Promise<string | null>;
+  browseForFile: (extensions?: string[]) => Promise<string | null>;
+  browseForModSource: () => Promise<string | null>;
   getUEVRStatus: () => Promise<UEVRStatus>;
   updateUEVR: () => Promise<UEVRStatus>;
   /** One-click: download UEVR + deploy AC7 profile + apply game config */
-  fullSetup: (ac7Path?: string) => Promise<void>;
+  fullSetup: (ac7Path?: string, overrides?: PathOverrides) => Promise<void>;
   applyDefaultProfile: () => Promise<string>;
   importProfile: () => Promise<string | null>;
   exportProfile: () => Promise<string | null>;
+  getUEVRSettings: (settingsPath?: string) => Promise<UEVRSettingsDocument>;
+  saveUEVRSettings: (items: Array<Pick<UEVRSettingItem, 'key' | 'value'>>, settingsPath?: string) => Promise<string>;
+  importUEVRSettings: (settingsPath?: string) => Promise<UEVRSettingsDocument | null>;
+  exportUEVRSettings: (items: Array<Pick<UEVRSettingItem, 'key' | 'value'>>, settingsPath?: string) => Promise<string | null>;
   applyGameConfig: (settings: ProfileSettings) => Promise<string>;
-  launchVR: (ac7Path?: string, options?: { extraWarmup?: boolean }) => Promise<void>;
+  launchVR: (ac7Path?: string, options?: { extraWarmup?: boolean; overrides?: PathOverrides }) => Promise<void>;
   abortLaunch: () => Promise<void>;
   /** Re-run dependency + software detection, returning structured issues for pre-flight. */
-  preflightCheck: (ac7Path?: string) => Promise<PreflightResult>;
+  preflightCheck: (ac7Path?: string, overrides?: PathOverrides) => Promise<PreflightResult>;
   /** Execute a one-click remedy by id. */
   runFixAction: (action: FixActionId, ac7Path?: string) => Promise<FixActionResult>;
   /** Build a sanitized plain-text diagnostic report ready for clipboard / paste. */
   buildDiagnosticsReport: () => Promise<string>;
+  exportDiagnosticsBundle: () => Promise<string | null>;
+  exportLogs: (lines: string[]) => Promise<string | null>;
   /** Undo the launcher's mutations (delete UEVR folder, profile, restore INI backup). */
   resetEverything: () => Promise<ResetResult>;
   getSettings: () => Promise<AppSettings>;
   saveSettings: (settings: AppSettings) => Promise<void>;
+  listMods: () => Promise<ModRecord[]>;
+  addMod: (request: AddModRequest) => Promise<AddModResult>;
+  setModEnabled: (id: string, enabled: boolean, ac7Path?: string, modsDir?: string, loaderDir?: string) => Promise<ModRecord[]>;
+  removeMod: (id: string) => Promise<ModRecord[]>;
+  reorderMods: (orderedIds: string[]) => Promise<ModRecord[]>;
   onUEVRProgress: (callback: (percent: number) => void) => () => void;
   onSetupProgress: (callback: (step: SetupStepStatus) => void) => () => void;
   onLaunchUpdate: (callback: (step: LaunchStepStatus) => void) => () => void;

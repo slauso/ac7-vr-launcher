@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { SoftwareDetectionResult, StatusItem } from '@shared/types';
+import type { PathOverrides, SoftwareDetectionResult, StatusItem } from '@shared/types';
 import { readRegistryValue } from '../utils/registry';
 import { resolveVirtualDesktopStreamerPath } from '../utils/vd-streamer';
 import { ERRORS } from './error-catalog';
@@ -36,8 +36,11 @@ export class SteamDetector {
     return libraries.some((lib) => fs.existsSync(appManifest(lib, appId)));
   }
 
-  public detect(manualAc7Path?: string): SoftwareDetectionResult {
-    const steamPath = this.getSteamPath();
+  public detect(manualAc7Path?: string, overrides?: PathOverrides): SoftwareDetectionResult {
+    const steamExeOverride = overrides?.steamExePath;
+    const steamPath = steamExeOverride
+      ? path.dirname(steamExeOverride)
+      : this.getSteamPath();
     const steamInstalled = Boolean(steamPath);
     const steamRunning = this.processManager.isRunning('steam.exe');
 
@@ -45,12 +48,12 @@ export class SteamDetector {
     const steamVRInstalled = steamPath ? this.findAppInstall(libraries, '250820') : false;
 
     const ac7FromLibraries = libraries.find((lib) => fs.existsSync(appManifest(lib, '502500')));
-    const ac7InstallPath = manualAc7Path || (ac7FromLibraries
+    const ac7InstallPath = overrides?.ac7InstallPath || manualAc7Path || (ac7FromLibraries
       ? path.join(ac7FromLibraries, 'steamapps', 'common', 'ACE COMBAT 7')
       : undefined);
     const ac7Installed = Boolean(ac7InstallPath && fs.existsSync(ac7InstallPath));
 
-    const virtualDesktopInstall = resolveVirtualDesktopStreamerPath();
+    const virtualDesktopInstall = overrides?.virtualDesktopPath || resolveVirtualDesktopStreamerPath();
     const virtualDesktopInstalled = Boolean(virtualDesktopInstall);
     const virtualDesktopRunning = this.processManager.isRunning('VirtualDesktop.Streamer.exe');
 

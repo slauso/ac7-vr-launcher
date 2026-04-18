@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import type { LaunchStepStatus, PreflightResult } from '@shared/types';
+import type { LaunchStepStatus, PathOverrides, PreflightResult } from '@shared/types';
 import { FixItButton } from '../components/FixItButton';
 import { LogPanel } from '../components/LogPanel';
 import { StatusBadge } from '../components/StatusBadge';
 
-export const LaunchStep: React.FC<{ ac7Path?: string }> = ({ ac7Path }) => {
+export const LaunchStep: React.FC<{ ac7Path?: string; pathOverrides?: PathOverrides }> = ({ ac7Path, pathOverrides }) => {
   const [steps, setSteps] = useState<Record<string, LaunchStepStatus>>({});
   const [logs, setLogs] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -41,13 +41,13 @@ export const LaunchStep: React.FC<{ ac7Path?: string }> = ({ ac7Path }) => {
     try {
       // Pre-flight re-verify so regressions (VD closed, UEVR deleted, VC++
       // gone) surface up-front instead of mid-flight.
-      const check = await window.ac7.preflightCheck(ac7Path);
+      const check = await window.ac7.preflightCheck(ac7Path, pathOverrides);
       if (!check.ok) {
         setPreflight(check);
         setBusy(false);
         return;
       }
-      await window.ac7.launchVR(ac7Path, { extraWarmup });
+      await window.ac7.launchVR(ac7Path, { extraWarmup, overrides: pathOverrides });
     } catch (err) {
       // The main-process `launch:update` with id='error' already carries
       // the code + fixAction, so we only need a fallback string here.
@@ -107,7 +107,7 @@ export const LaunchStep: React.FC<{ ac7Path?: string }> = ({ ac7Path }) => {
                       ac7Path={ac7Path}
                       onDone={(ok, msg) => {
                         setFixMessage(msg);
-                        if (ok) void window.ac7.preflightCheck(ac7Path).then(setPreflight);
+                         if (ok) void window.ac7.preflightCheck(ac7Path, pathOverrides).then(setPreflight);
                       }}
                     />
                   ) : null}

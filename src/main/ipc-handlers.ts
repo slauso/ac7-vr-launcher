@@ -1,16 +1,21 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import AdmZip from 'adm-zip';
 import { BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
 import type {
+  AddModRequest,
+  AddModResult,
   AppSettings,
   FixActionId,
   LaunchStepStatus,
+  PathOverrides,
   PreflightResult,
   ProfileSettings,
   ResetResult,
   SetupStepStatus,
-  StatusItem
+  StatusItem,
+  UEVRSettingItem
 } from '@shared/types';
 import { BackupManager } from './services/backup-manager';
 import { DependencyChecker } from './services/dependency-checker';
@@ -19,10 +24,12 @@ import { ERRORS } from './services/error-catalog';
 import { runFixAction } from './services/fix-actions';
 import { GameConfigService } from './services/game-config';
 import { LaunchSequence } from './services/launch-sequence';
+import { ModManager } from './services/mod-manager';
 import { ProcessManager } from './services/process-manager';
 import { ProfileManager } from './services/profile-manager';
 import { SteamDetector } from './services/steam-detector';
 import { UEVRManager } from './services/uevr-manager';
+import { UEVRSettingsService } from './services/uevr-settings';
 import { registerInjectorTask } from './utils/scheduled-task';
 
 const AC7_PROCESS_EXE = 'Ace7Game-Win64-Shipping.exe';
@@ -36,6 +43,8 @@ const backupManager = new BackupManager(managedRoot);
 const dependencyChecker = new DependencyChecker();
 const steamDetector = new SteamDetector(processManager);
 const uevrManager = new UEVRManager(managedRoot, backupManager);
+const uevrSettings = new UEVRSettingsService();
+const modManager = new ModManager(managedRoot);
 const profileManager = new ProfileManager(managedRoot, path.resolve(__dirname, '../assets/default-profile.json'));
 const gameConfig = new GameConfigService(backupManager);
 const launchSequence = new LaunchSequence(processManager, uevrManager.managedPath);
@@ -54,7 +63,8 @@ const pushLog = (line: string) => {
 const defaultSettings: AppSettings = {
   theme: 'dark-blue',
   autoUpdateUEVR: true,
-  minimizeToTray: false
+  minimizeToTray: false,
+  paths: {}
 };
 
 const readSettings = async (): Promise<AppSettings> => {
@@ -68,15 +78,38 @@ const writeSettings = async (settings: AppSettings): Promise<void> => {
   await fs.promises.writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
 };
 
+const stamp = (): string => new Date().toISOString().replace(/[:.]/g, '-');
+
+const resolveOverrides = async (overrides?: PathOverrides): Promise<PathOverrides> => {
+  const settings = await readSettings();
+  return { ...(settings.paths ?? {}), ...(overrides ?? {}) };
+};
+
 export const registerIpcHandlers = (window: BrowserWindow): void => {
   const emit = (channel: string, payload: unknown) => window.webContents.send(channel, payload);
 
   ipcMain.handle('deps:check', () => dependencyChecker.check());
-  ipcMain.handle('software:detect', (_event, manualPath?: string) => steamDetector.detect(manualPath));
+  ipcMain.handle('software:detect', async (_event, manualPath?: string, overrides?: PathOverrides) =>
+    steamDetector.detect(manualPath, await resolveOverrides(overrides))
+  );
   ipcMain.handle('shell:openExternal', async (_event, url: string) => shell.openExternal(url));
 
   ipcMain.handle('dialog:browseFolder', async () => {
     const result = await dialog.showOpenDialog(window, { properties: ['openDirectory'] });
+    return result.canceled ? null : result.filePaths[0];
+  });
+  ipcMain.handle('dialog:browseFile', async (_event, extensions?: string[]) => {
+    const result = await dialog.showOpenDialog(window, {
+      properties: ['openFile'],
+      filters: extensions?.length ? [{ name: 'File', extensions }] : undefined
+    });
+    return result.canceled ? null : result.filePaths[0];
+  });
+  ipcMain.handle('dialog:browseModSource', async () => {
+    const result = await dialog.showOpenDialog(window, {
+      properties: ['openFile', 'openDirectory'],
+      filters: [{ name: 'Mod files', extensions: ['zip', 'pak', 'ini', 'cfg', 'dll'] }]
+    });
     return result.canceled ? null : result.filePaths[0];
   });
 
@@ -94,7 +127,8 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
    * Any step that fails is surfaced as a per-step error status with a
    * catalog code + fixAction id so the UI can show a "Fix it for me" button.
    */
-  ipcMain.handle('setup:full', async (_event, _ac7Path?: string) => {
+  ipcMain.handle('setup:full', async (_event, _ac7Path?: string, incomingOverrides?: PathOverrides) => {
+    const pathOverrides = await resolveOverrides(incomingOverrides);
     const step = (payload: SetupStepStatus) => emit('setup:progress', payload);
 
     // 1 – UEVR
@@ -184,7 +218,7 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
     // GUI interaction. Failure here is non-fatal: launches will fall back to
     // the legacy launchElevated() path (one UAC per launch).
     step({ id: 'inject-task', label: 'Install one-click VR injector', status: 'pending' });
-    const injectorPath = path.join(uevrManager.managedPath, 'UEVRInjector.exe');
+    const injectorPath = pathOverrides.uevrInjectorPath || path.join(uevrManager.managedPath, 'UEVRInjector.exe');
     if (!fs.existsSync(injectorPath)) {
       step({
         id: 'inject-task',
@@ -244,9 +278,41 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
     return profileManager.exportProfile(result.filePath);
   });
 
+  ipcMain.handle('uevr:settings:get', async (_event, settingsPath?: string) =>
+    uevrSettings.read(settingsPath)
+  );
+  ipcMain.handle(
+    'uevr:settings:save',
+    async (_event, items: Array<Pick<UEVRSettingItem, 'key' | 'value'>>, settingsPath?: string) =>
+      uevrSettings.write(items, settingsPath)
+  );
+  ipcMain.handle('uevr:settings:import', async (_event, settingsPath?: string) => {
+    const result = await dialog.showOpenDialog(window, {
+      properties: ['openFile'],
+      filters: [{ name: 'UEVR settings', extensions: ['txt', 'cfg', 'ini', 'json'] }]
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    return uevrSettings.importFrom(result.filePaths[0], settingsPath);
+  });
+  ipcMain.handle(
+    'uevr:settings:export',
+    async (_event, items: Array<Pick<UEVRSettingItem, 'key' | 'value'>>, settingsPath?: string) => {
+      const result = await dialog.showSaveDialog(window, {
+        title: 'Export UEVR Settings',
+        defaultPath: 'uevr-settings.txt',
+        filters: [{ name: 'UEVR settings', extensions: ['txt', 'cfg'] }]
+      });
+      if (result.canceled || !result.filePath) return null;
+      return uevrSettings.exportTo(result.filePath, items, settingsPath);
+    }
+  );
+
   ipcMain.handle('game:applyConfig', (_event, settings: ProfileSettings) => gameConfig.apply(settings));
 
-  ipcMain.handle('launch:start', async (_event, ac7Path?: string, options?: { extraWarmup?: boolean }) => {
+  ipcMain.handle(
+    'launch:start',
+    async (_event, ac7Path?: string, options?: { extraWarmup?: boolean; overrides?: PathOverrides }) => {
+      const pathOverrides = await resolveOverrides(options?.overrides);
     try {
       await launchSequence.run(
         ac7Path,
@@ -260,7 +326,7 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
           pushLog(line);
           emit('launch:log', line);
         },
-        { extraWarmup: options?.extraWarmup }
+        { extraWarmup: options?.extraWarmup, overrides: pathOverrides }
       );
     } catch (err) {
       // Surface the tagged code / fixAction the launch sequence attached to
@@ -279,7 +345,8 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
       } satisfies LaunchStepStatus);
       throw err;
     }
-  });
+    }
+  );
 
   ipcMain.handle('launch:abort', () => launchSequence.abort());
 
@@ -289,9 +356,10 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
    * folder deleted, VC++ uninstalled, AC7 library offline) surfaces as an
    * actionable toast rather than a mid-flight failure.
    */
-  ipcMain.handle('launch:preflight', async (_event, ac7Path?: string): Promise<PreflightResult> => {
+  ipcMain.handle('launch:preflight', async (_event, ac7Path?: string, overrides?: PathOverrides): Promise<PreflightResult> => {
+    const pathOverrides = await resolveOverrides(overrides);
     const deps = dependencyChecker.check();
-    const soft = steamDetector.detect(ac7Path);
+    const soft = steamDetector.detect(ac7Path, pathOverrides);
     const uevr = await uevrManager.getStatus();
 
     const issues: StatusItem[] = [];
@@ -302,12 +370,13 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
       if (item.id === 'steamvr') continue;
       if (item.status === 'error' || (item.id === 'vd' && item.status !== 'ok')) issues.push(item);
     }
-    if (!uevr.injectorExists) {
+    const injectorPath = pathOverrides.uevrInjectorPath || path.join(uevr.managedPath, 'UEVRInjector.exe');
+    if (!fs.existsSync(injectorPath)) {
       issues.push({
         id: 'uevr-injector',
         label: 'UEVR injector missing',
         status: 'error',
-        details: uevr.managedPath,
+        details: injectorPath,
         code: ERRORS.UEVR_MISSING.code,
         fixAction: ERRORS.UEVR_MISSING.fixAction,
         fixActionLabel: ERRORS.UEVR_MISSING.fixActionLabel
@@ -354,6 +423,37 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
     clipboard.writeText(report);
     return report;
   });
+  ipcMain.handle('diagnostics:exportBundle', async () => {
+    const result = await dialog.showSaveDialog(window, {
+      title: 'Export diagnostics bundle',
+      defaultPath: `ac7-vr-diagnostics-${stamp()}.zip`,
+      filters: [{ name: 'Zip archive', extensions: ['zip'] }]
+    });
+    if (result.canceled || !result.filePath) return null;
+    const zip = new AdmZip();
+    if (fs.existsSync(settingsPath)) zip.addLocalFile(settingsPath, '', 'settings.json');
+    const modsPath = path.join(managedRoot, 'mods.json');
+    if (fs.existsSync(modsPath)) zip.addLocalFile(modsPath, '', 'mods.json');
+    const report = await buildDiagnosticsReport({
+      dependencyChecker,
+      steamDetector,
+      uevrManager,
+      getRecentLogs: () => recentLogs
+    });
+    zip.addFile('diagnostics.txt', Buffer.from(report, 'utf8'));
+    zip.writeZip(result.filePath);
+    return result.filePath;
+  });
+  ipcMain.handle('logs:export', async (_event, lines: string[]) => {
+    const result = await dialog.showSaveDialog(window, {
+      title: 'Export logs',
+      defaultPath: `ac7-vr-launcher-logs-${stamp()}.txt`,
+      filters: [{ name: 'Text', extensions: ['txt', 'log'] }]
+    });
+    if (result.canceled || !result.filePath) return null;
+    await fs.promises.writeFile(result.filePath, `${lines.join('\n')}\n`, 'utf8');
+    return result.filePath;
+  });
 
   /**
    * "Reset everything": atomic rollback of launcher mutations.
@@ -381,5 +481,36 @@ export const registerIpcHandlers = (window: BrowserWindow): void => {
   });
 
   ipcMain.handle('settings:get', () => readSettings());
-  ipcMain.handle('settings:save', async (_event, settings: AppSettings) => writeSettings(settings));
+  ipcMain.handle('settings:save', async (_event, settings: AppSettings) => {
+    const merged: AppSettings = {
+      ...defaultSettings,
+      ...settings,
+      paths: { ...(defaultSettings.paths ?? {}), ...(settings.paths ?? {}) }
+    };
+    await writeSettings(merged);
+  });
+
+  ipcMain.handle('mods:list', () => modManager.list());
+  ipcMain.handle('mods:add', async (_event, request: AddModRequest): Promise<AddModResult> => {
+    const overrides = await resolveOverrides();
+    return modManager.add({
+      ...request,
+      ac7Path: request.ac7Path || overrides.ac7InstallPath,
+      modsDir: request.modsDir || overrides.ac7ModsPath,
+      loaderDir: request.loaderDir || overrides.ac7LoaderPath
+    });
+  });
+  ipcMain.handle(
+    'mods:setEnabled',
+    async (
+      _event,
+      id: string,
+      enabled: boolean,
+      _ac7Path?: string,
+      _modsDir?: string,
+      _loaderDir?: string
+    ) => modManager.setEnabled(id, enabled)
+  );
+  ipcMain.handle('mods:remove', async (_event, id: string) => modManager.remove(id));
+  ipcMain.handle('mods:reorder', async (_event, orderedIds: string[]) => modManager.reorder(orderedIds));
 };

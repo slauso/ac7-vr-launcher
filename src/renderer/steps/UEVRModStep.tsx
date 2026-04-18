@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import type { SetupStepStatus, UEVRStatus } from '@shared/types';
+import type { PathOverrides, SetupStepStatus, UEVRStatus } from '@shared/types';
 import { FixItButton } from '../components/FixItButton';
 import { ProgressBar } from '../components/ProgressBar';
 import { StatusBadge } from '../components/StatusBadge';
 
-export const UEVRModStep: React.FC<{ ac7Path?: string }> = ({ ac7Path }) => {
+export const UEVRModStep: React.FC<{ ac7Path?: string; pathOverrides?: PathOverrides }> = ({ ac7Path, pathOverrides }) => {
   const [status, setStatus] = useState<UEVRStatus | null>(null);
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -40,7 +40,7 @@ export const UEVRModStep: React.FC<{ ac7Path?: string }> = ({ ac7Path }) => {
     setSetupSteps({});
     setProgress(0);
     try {
-      await window.ac7.fullSetup(ac7Path);
+      await window.ac7.fullSetup(ac7Path, pathOverrides);
       await refreshStatus();
       setDone(true);
     } catch (err) {

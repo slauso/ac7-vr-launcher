@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { SoftwareDetectionResult } from '@shared/types';
+import type { PathOverrides, SoftwareDetectionResult } from '@shared/types';
 import { FixItButton } from '../components/FixItButton';
 import { PathPicker } from '../components/PathPicker';
 import { StatusBadge } from '../components/StatusBadge';
@@ -7,7 +7,8 @@ import { StatusBadge } from '../components/StatusBadge';
 export const SoftwareDetectStep: React.FC<{
   ac7Path?: string;
   onAc7Path: (path?: string) => void;
-}> = ({ ac7Path, onAc7Path }) => {
+  pathOverrides?: PathOverrides;
+}> = ({ ac7Path, onAc7Path, pathOverrides }) => {
   const [result, setResult] = useState<SoftwareDetectionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fixMessage, setFixMessage] = useState<string | null>(null);
@@ -15,7 +16,7 @@ export const SoftwareDetectStep: React.FC<{
   const detect = async () => {
     setError(null);
     try {
-      const output = await window.ac7.detectSoftware(ac7Path);
+      const output = await window.ac7.detectSoftware(ac7Path, pathOverrides);
       onAc7Path(output.ac7InstallPath);
       setResult(output);
     } catch (err) {
