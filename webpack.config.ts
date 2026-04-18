@@ -66,7 +66,10 @@ const rendererConfig: Configuration & { devServer?: Record<string, unknown> } = 
   plugins: [
     new HtmlWebpackPlugin({ template: './src/renderer/index.html' }),
     new CopyWebpackPlugin({
-      patterns: [{ from: 'src/assets', to: path.resolve(__dirname, 'dist/assets') }]
+      patterns: [
+        { from: 'src/assets', to: path.resolve(__dirname, 'dist/assets') },
+        { from: 'resources', to: path.resolve(__dirname, 'dist/resources') }
+      ]
     })
   ],
   devServer: {
