@@ -1,17 +1,34 @@
 # AC7 VR Launcher
 
-AC7 VR Launcher is a Windows-focused Electron + TypeScript wizard that automates setup and launch for **Ace Combat 7: Skies Unknown** in VR with **Quest 3 + Virtual Desktop + UEVR**.
+AC7 VR Launcher is a Windows-focused Electron + TypeScript utility that now acts as a **one-stop shop** for **Ace Combat 7: Skies Unknown** in VR with **Quest 3 + Virtual Desktop + UEVR**.
 
 ## Features
 
-- Multi-step setup wizard with individual controls per stage
+- Integrated tabs for **UEVR**, **Camera**, **Mods**, **Skins**, **Overlays**, and **Settings**
 - System dependency checks (Windows version, VC++ Runtime, DirectX)
 - Steam / SteamVR / AC7 / Virtual Desktop detection with launch/install links
-- UEVR manager that fetches latest release from GitHub and installs it
+- Full UEVR integration: status, inject-from-launcher, import local folder, runtime toggles, profile deploy
+- Camera preset manager (inside cockpit / outside chase / cinematic + FOV/offset/rotation sliders)
+- Mod manager for `~mods` / `~mods_disabled` with install/enable/disable/uninstall
+- Skin manager grouped by aircraft with single-active-skin enforcement per aircraft
+- Overlay manager with master toggle + common in-VR overlay switches
+- Unified settings persisted at `%APPDATA%/ac7-vr-launcher/settings.json`
 - Profile and game configuration tools (borderless mode, motion blur off, resolution)
 - One-click launch sequence with real-time status updates and logs
-- Settings + about panel with useful links
 - Dark aviation-themed UI
+
+## Quick Start
+
+1. Open **Settings** and set your AC7 + UEVR paths (auto-detection is attempted first).
+2. Open **UEVR** and click **Install & Configure** (or import an existing UEVR folder).
+3. Use **Camera**, **Overlays**, **Mods**, and **Skins** to apply your preferred VR setup.
+4. Open **Launch VR** and click **Launch VR**.
+
+## UI Screenshot Placeholders
+
+- `docs/screenshots/uevr-tab.png`
+- `docs/screenshots/camera-tab.png`
+- `docs/screenshots/mods-tab.png`
 
 ## Install & Use — Quest 3 + Virtual Desktop + Steam AC7 (Non-Technical Guide)
 

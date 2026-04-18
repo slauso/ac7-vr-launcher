@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import type { SetupStepStatus, UEVRStatus } from '@shared/types';
+import type { SetupStepStatus, UEVRRuntimeOptions, UEVRStatus } from '@shared/types';
 import { FixItButton } from '../components/FixItButton';
 import { ProgressBar } from '../components/ProgressBar';
 import { StatusBadge } from '../components/StatusBadge';
@@ -12,10 +12,12 @@ export const UEVRModStep: React.FC<{ ac7Path?: string }> = ({ ac7Path }) => {
   const [error, setError] = useState<string | null>(null);
   const [fixMessage, setFixMessage] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [runtimeOptions, setRuntimeOptions] = useState<UEVRRuntimeOptions | null>(null);
 
   const refreshStatus = async () => {
     try {
       setStatus(await window.ac7.getUEVRStatus());
+      setRuntimeOptions(await window.ac7.getUEVRRuntimeOptions());
     } catch (err) {
       setError((err as Error).message);
     }
@@ -66,6 +68,10 @@ export const UEVRModStep: React.FC<{ ac7Path?: string }> = ({ ac7Path }) => {
         <button type="button" disabled={busy} onClick={runSetup} className="btn-primary">
           {alreadyInstalled ? '↺ Re-install & Reconfigure' : '⬇ Install & Configure'}
         </button>
+        <button type="button" onClick={() => void window.ac7.injectUEVR().then(refreshStatus)}>Inject UEVR now</button>
+        <button type="button" onClick={() => void window.ac7.importUEVRFolder().then(refreshStatus)}>Import UEVR folder</button>
+        <button type="button" onClick={() => void window.ac7.deployUEVRProfile().then(refreshStatus)}>Deploy AC7 profile</button>
+        <button type="button" onClick={() => void window.ac7.openExternal('https://github.com/praydog/UEVR/releases/latest')}>Download UEVR</button>
       </div>
 
       {busy ? <ProgressBar value={progress} /> : null}
@@ -103,16 +109,49 @@ export const UEVRModStep: React.FC<{ ac7Path?: string }> = ({ ac7Path }) => {
 
       <div className="kv-list">
         <div><span>UEVR installed</span><strong>{status?.injectorExists ? `Yes (${status.installedVersion ?? 'version unknown'})` : 'No'}</strong></div>
+        <div><span>Injection status</span><strong>{status?.injectionStatus ?? 'unknown'}</strong></div>
         <div><span>AC7 profile deployed</span><strong>{status?.profileDeployed ? 'Yes' : 'No'}</strong></div>
         <div>
           <span>One-click VR injector</span>
           <strong>{status?.injectorTaskRegistered ? 'Yes (no UAC needed)' : 'No (UAC prompt per launch)'}</strong>
         </div>
         <div>
-          <span>Managed path</span>
-          <strong className="muted" style={{ fontSize: '11px' }}>{status?.managedPath ?? '-'}</strong>
+          <span>UEVR path</span>
+          <strong className="muted" style={{ fontSize: '11px' }}>{status?.selectedPath ?? '-'}</strong>
         </div>
       </div>
+
+      {runtimeOptions ? (
+        <div className="toggle-grid">
+          <label>
+            Rendering method
+            <select
+              value={runtimeOptions.renderingMethod}
+              onChange={(event) =>
+                setRuntimeOptions((prev) => (prev ? { ...prev, renderingMethod: event.target.value as UEVRRuntimeOptions['renderingMethod'] } : prev))
+              }
+            >
+              <option value="native-stereo">Native stereo</option>
+              <option value="synchronized-sequential">Synchronized sequential</option>
+              <option value="alternating">Alternating</option>
+            </select>
+          </label>
+          <label>
+            Runtime
+            <select
+              value={runtimeOptions.runtime}
+              onChange={(event) =>
+                setRuntimeOptions((prev) => (prev ? { ...prev, runtime: event.target.value as UEVRRuntimeOptions['runtime'] } : prev))
+              }
+            >
+              <option value="openxr">OpenXR</option>
+              <option value="openvr">OpenVR</option>
+            </select>
+          </label>
+          <label><input type="checkbox" checked={runtimeOptions.ghostingFix} onChange={(event) => setRuntimeOptions((prev) => (prev ? { ...prev, ghostingFix: event.target.checked } : prev))} /> Ghosting fix</label>
+          <button type="button" onClick={() => void window.ac7.setUEVRRuntimeOptions(runtimeOptions).then(() => setFixMessage('UEVR runtime options saved.'))}>Save runtime options</button>
+        </div>
+      ) : null}
     </div>
   );
 };

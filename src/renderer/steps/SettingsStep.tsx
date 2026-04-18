@@ -4,6 +4,10 @@ import type { AppSettings } from '@shared/types';
 export const SettingsStep: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>({
     theme: 'dark-blue',
+    defaultVRRuntime: 'openxr',
+    defaultRenderingMethod: 'synchronized-sequential',
+    autoInjectUEVR: true,
+    launchOptions: '',
     autoUpdateUEVR: true,
     minimizeToTray: false
   });
@@ -16,7 +20,7 @@ export const SettingsStep: React.FC = () => {
   }, []);
 
   const save = async () => {
-    await window.ac7.saveSettings(settings);
+    await window.ac7.writeSettings(settings);
     setMessage('Settings saved');
   };
 
@@ -77,6 +81,40 @@ export const SettingsStep: React.FC = () => {
     <div className="step-body">
       <div className="toggle-grid">
         <label>
+          AC7 path
+          <div className="path-row">
+            <input value={settings.ac7Path ?? ''} onChange={(event) => setSettings((prev) => ({ ...prev, ac7Path: event.target.value, defaultAc7Path: event.target.value }))} />
+            <button type="button" onClick={() => void window.ac7.browseForFolder().then((folder) => folder && setSettings((prev) => ({ ...prev, ac7Path: folder, defaultAc7Path: folder })))}>Browse</button>
+          </div>
+        </label>
+        <label>
+          UEVR path
+          <div className="path-row">
+            <input value={settings.uevrPath ?? ''} onChange={(event) => setSettings((prev) => ({ ...prev, uevrPath: event.target.value }))} />
+            <button type="button" onClick={() => void window.ac7.browseForFolder().then((folder) => folder && setSettings((prev) => ({ ...prev, uevrPath: folder })))}>Browse</button>
+          </div>
+        </label>
+        <label>
+          Default VR runtime
+          <select value={settings.defaultVRRuntime} onChange={(e) => setSettings((prev) => ({ ...prev, defaultVRRuntime: e.target.value as AppSettings['defaultVRRuntime'] }))}>
+            <option value="openxr">OpenXR</option>
+            <option value="openvr">OpenVR</option>
+          </select>
+        </label>
+        <label>
+          Default rendering method
+          <select value={settings.defaultRenderingMethod} onChange={(e) => setSettings((prev) => ({ ...prev, defaultRenderingMethod: e.target.value as AppSettings['defaultRenderingMethod'] }))}>
+            <option value="native-stereo">Native stereo</option>
+            <option value="synchronized-sequential">Synchronized sequential</option>
+            <option value="alternating">Alternating</option>
+          </select>
+        </label>
+        <label>
+          Launch options
+          <input value={settings.launchOptions} onChange={(event) => setSettings((prev) => ({ ...prev, launchOptions: event.target.value }))} />
+        </label>
+        <label><input type="checkbox" checked={settings.autoInjectUEVR} onChange={(e) => setSettings((prev) => ({ ...prev, autoInjectUEVR: e.target.checked }))} /> Auto-inject UEVR on launch</label>
+        <label>
           Theme
           <select value={settings.theme} onChange={(e) => setSettings((prev) => ({ ...prev, theme: e.target.value as AppSettings['theme'] }))}>
             <option value="dark">Dark</option>
@@ -88,6 +126,8 @@ export const SettingsStep: React.FC = () => {
       </div>
       <div className="toolbar">
         <button type="button" onClick={save}>Save Settings</button>
+        <button type="button" onClick={() => void window.ac7.createBackup().then(() => setMessage('Backup created.'))}>Backup mods + profile</button>
+        <button type="button" onClick={() => void window.ac7.restoreBackup().then(() => setMessage('Backup restored.'))}>Restore mods + profile</button>
         <button type="button" onClick={() => void window.ac7.openExternal('https://github.com/praydog/UEVR')}>UEVR GitHub</button>
         <button type="button" onClick={() => void window.ac7.openExternal('https://discord.gg/flat2vr')}>Flat2VR Discord</button>
         <button type="button" onClick={() => void window.ac7.openExternal('https://www.vrdesktop.net/')}>Virtual Desktop</button>

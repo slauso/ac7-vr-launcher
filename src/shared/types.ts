@@ -61,7 +61,10 @@ export interface UEVRStatus {
   installedVersion?: string;
   latestVersion?: string;
   managedPath: string;
+  selectedPath: string;
+  autoLocatedPath?: string;
   injectorExists: boolean;
+  injectionStatus: 'not-running' | 'running' | 'injected';
   /** True when the AC7 UEVR config has been deployed to %APPDATA%\UnrealVR\games\Ace7Game-Win64-Shipping\ */
   profileDeployed: boolean;
   /**
@@ -70,6 +73,19 @@ export interface UEVRStatus {
    * skips the per-launch UAC prompt.
    */
   injectorTaskRegistered: boolean;
+}
+
+export type UEVRRenderingMethod = 'native-stereo' | 'synchronized-sequential' | 'alternating';
+export type UEVRRuntime = 'openxr' | 'openvr';
+
+export interface UEVRRuntimeOptions {
+  renderingMethod: UEVRRenderingMethod;
+  runtime: UEVRRuntime;
+  ghostingFix: boolean;
+  overlaysEnabled: boolean;
+  performanceHud: boolean;
+  controllerBindingsOverlay: boolean;
+  recenterPrompt: boolean;
 }
 
 export interface SetupStepStatus {
@@ -104,8 +120,41 @@ export interface LaunchStepStatus {
 export interface AppSettings {
   theme: 'dark' | 'dark-blue';
   defaultAc7Path?: string;
+  ac7Path?: string;
+  uevrPath?: string;
+  defaultVRRuntime: UEVRRuntime;
+  defaultRenderingMethod: UEVRRenderingMethod;
+  autoInjectUEVR: boolean;
+  launchOptions: string;
   autoUpdateUEVR: boolean;
   minimizeToTray: boolean;
+}
+
+export type CameraMode = 'inside-cockpit' | 'outside-chase' | 'free-cinematic';
+
+export interface CameraPreset {
+  id: string;
+  name: string;
+  mode: CameraMode;
+  fov: number;
+  offsetX: number;
+  offsetY: number;
+  offsetZ: number;
+  pitch: number;
+  yaw: number;
+  roll: number;
+}
+
+export interface ModEntry {
+  fileName: string;
+  fullPath: string;
+  enabled: boolean;
+  size: number;
+  dateAdded: string;
+  description?: string;
+  type?: 'skin' | 'mod';
+  aircraft?: string;
+  thumbnailPath?: string;
 }
 
 /**
@@ -139,7 +188,12 @@ export interface AC7Api {
   openExternal: (url: string) => Promise<void>;
   browseForFolder: () => Promise<string | null>;
   getUEVRStatus: () => Promise<UEVRStatus>;
+  injectUEVR: () => Promise<void>;
   updateUEVR: () => Promise<UEVRStatus>;
+  importUEVRFolder: () => Promise<string | null>;
+  deployUEVRProfile: () => Promise<void>;
+  getUEVRRuntimeOptions: () => Promise<UEVRRuntimeOptions>;
+  setUEVRRuntimeOptions: (options: UEVRRuntimeOptions) => Promise<void>;
   /** One-click: download UEVR + deploy AC7 profile + apply game config */
   fullSetup: (ac7Path?: string) => Promise<void>;
   applyDefaultProfile: () => Promise<string>;
@@ -158,6 +212,18 @@ export interface AC7Api {
   resetEverything: () => Promise<ResetResult>;
   getSettings: () => Promise<AppSettings>;
   saveSettings: (settings: AppSettings) => Promise<void>;
+  readSettings: () => Promise<AppSettings>;
+  writeSettings: (settings: AppSettings) => Promise<void>;
+  browseForModFile: () => Promise<string | null>;
+  listMods: () => Promise<ModEntry[]>;
+  enableMod: (fileName: string) => Promise<void>;
+  disableMod: (fileName: string) => Promise<void>;
+  installModFromPath: (sourcePath: string) => Promise<void>;
+  uninstallMod: (fileName: string) => Promise<void>;
+  getCameraPresets: () => Promise<CameraPreset[]>;
+  setCameraPreset: (preset: CameraPreset) => Promise<void>;
+  createBackup: () => Promise<void>;
+  restoreBackup: () => Promise<void>;
   onUEVRProgress: (callback: (percent: number) => void) => () => void;
   onSetupProgress: (callback: (step: SetupStepStatus) => void) => () => void;
   onLaunchUpdate: (callback: (step: LaunchStepStatus) => void) => () => void;
