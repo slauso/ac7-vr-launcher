@@ -53,8 +53,10 @@ export interface SoftwareDetectionResult {
 
 export interface UEVRReleaseInfo {
   version: string;
+  assetName: string;
   downloadUrl: string;
-  fileName: string;
+  sha256: string;
+  releasePageUrl: string;
 }
 
 export interface UEVRStatus {
