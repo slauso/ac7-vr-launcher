@@ -139,8 +139,9 @@ export class UEVRManager {
 
     const archivePath = path.join(this.managedPath, latest.assetName);
     await downloadFile(latest.downloadUrl, archivePath, onProgress);
-    const actualSha = await this.computeFileSha256(archivePath);
-    if (actualSha !== latest.sha256.toLowerCase()) {
+    const actualSha = (await this.computeFileSha256(archivePath)).toLowerCase();
+    const expectedSha = latest.sha256.trim().toLowerCase();
+    if (actualSha !== expectedSha) {
       await fs.promises.unlink(archivePath).catch(() => undefined);
       throw new Error('UEVR download failed integrity check — refusing to install');
     }
