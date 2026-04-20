@@ -7,7 +7,7 @@ AC7 VR Launcher is a Windows-focused Electron + TypeScript wizard that automates
 - Multi-step setup wizard with individual controls per stage
 - System dependency checks (Windows version, VC++ Runtime, DirectX)
 - Steam / SteamVR / AC7 / Virtual Desktop detection with launch/install links
-- UEVR manager that fetches latest release from GitHub and installs it
+- UEVR manager that installs a pinned, hash-verified official UEVR release
 - Profile and game configuration tools (borderless mode, motion blur off, resolution)
 - One-click launch sequence with real-time status updates and logs
 - Settings + about panel with useful links

@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import https from 'node:https';
+import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
@@ -8,15 +8,11 @@ import { downloadFile } from '../utils/download';
 import { removeInjectorTask, taskExists } from '../utils/scheduled-task';
 import { BackupManager } from './backup-manager';
 
-interface GitHubRelease {
-  tag_name: string;
-  assets: Array<{ name: string; browser_download_url: string }>;
-}
-
 /** Directory where UEVR reads game-specific configs */
 const UEVR_GAMES_DIR = path.join(os.homedir(), 'AppData', 'Roaming', 'UnrealVR', 'games');
 /** Process name without extension for Ace Combat 7 — used as UEVR's game profile directory name */
 const AC7_PROCESS_NAME = 'Ace7Game-Win64-Shipping';
+const UEVR_RELEASE_MANIFEST_REL = path.join('resources', 'uevr', 'uevr-release.json');
 
 export class UEVRManager {
   constructor(private readonly managedRoot: string, private readonly backupManager?: BackupManager) {}
@@ -29,37 +25,33 @@ export class UEVRManager {
     return path.join(UEVR_GAMES_DIR, AC7_PROCESS_NAME);
   }
 
-  public async getLatestRelease(): Promise<UEVRReleaseInfo> {
-    const json = await new Promise<string>((resolve, reject) => {
-      https
-        .get(
-          'https://api.github.com/repos/praydog/UEVR/releases/latest',
-          { headers: { 'User-Agent': 'ac7-vr-launcher', Accept: 'application/vnd.github+json' } },
-          (response) => {
-            if (response.statusCode !== 200) {
-              reject(new Error(`GitHub API failed with status ${response.statusCode}`));
-              return;
-            }
-            let data = '';
-            response.on('data', (chunk) => {
-              data += String(chunk);
-            });
-            response.on('end', () => resolve(data));
-          }
-        )
-        .on('error', reject);
-    });
+  private getReleaseManifestPath(): string {
+    const distPath = path.resolve(__dirname, '..', '..', '..', UEVR_RELEASE_MANIFEST_REL);
+    if (fs.existsSync(distPath)) return distPath;
+    return path.resolve(process.cwd(), UEVR_RELEASE_MANIFEST_REL);
+  }
 
-    const release = JSON.parse(json) as GitHubRelease;
-    const zipAsset = release.assets.find((asset) => asset.name.toLowerCase().endsWith('.zip'));
-    if (!zipAsset) {
-      throw new Error('No zip asset found in latest UEVR release');
+  public async getPinnedRelease(): Promise<UEVRReleaseInfo> {
+    const manifestPath = this.getReleaseManifestPath();
+    const manifestJson = await fs.promises.readFile(manifestPath, 'utf8');
+    const manifest = JSON.parse(manifestJson) as Partial<UEVRReleaseInfo>;
+
+    if (
+      !manifest.version
+      || !manifest.assetName
+      || !manifest.downloadUrl
+      || !manifest.sha256
+      || !manifest.releasePageUrl
+    ) {
+      throw new Error(`Invalid UEVR release manifest at ${manifestPath}`);
     }
 
     return {
-      version: release.tag_name,
-      downloadUrl: zipAsset.browser_download_url,
-      fileName: zipAsset.name
+      version: manifest.version,
+      assetName: manifest.assetName,
+      downloadUrl: manifest.downloadUrl,
+      sha256: manifest.sha256,
+      releasePageUrl: manifest.releasePageUrl
     };
   }
 
@@ -143,10 +135,16 @@ export class UEVRManager {
 
   public async update(onProgress: (percent: number) => void): Promise<UEVRStatus> {
     await fs.promises.mkdir(this.managedPath, { recursive: true });
-    const latest = await this.getLatestRelease();
+    const latest = await this.getPinnedRelease();
 
-    const archivePath = path.join(this.managedPath, latest.fileName);
+    const archivePath = path.join(this.managedPath, latest.assetName);
     await downloadFile(latest.downloadUrl, archivePath, onProgress);
+    const actualSha = (await this.computeFileSha256(archivePath)).toLowerCase();
+    const expectedSha = latest.sha256.trim().toLowerCase();
+    if (actualSha !== expectedSha) {
+      await fs.promises.unlink(archivePath).catch(() => undefined);
+      throw new Error('UEVR download failed integrity check — refusing to install');
+    }
 
     const zip = new AdmZip(archivePath);
     zip.extractAllTo(this.managedPath, true);
@@ -160,5 +158,16 @@ export class UEVRManager {
     }
 
     return { ...status, latestVersion: latest.version };
+  }
+
+  private async computeFileSha256(filePath: string): Promise<string> {
+    const hash = crypto.createHash('sha256');
+    await new Promise<void>((resolve, reject) => {
+      const stream = fs.createReadStream(filePath);
+      stream.on('data', (chunk) => hash.update(chunk));
+      stream.on('error', reject);
+      stream.on('end', () => resolve());
+    });
+    return hash.digest('hex');
   }
 }

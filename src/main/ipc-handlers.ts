@@ -1,7 +1,6 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import { BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
 import type {
   AppSettings,
   FixActionId,
@@ -27,7 +26,7 @@ import { registerInjectorTask } from './utils/scheduled-task';
 
 const AC7_PROCESS_EXE = 'Ace7Game-Win64-Shipping.exe';
 
-const managedRoot = path.join(os.homedir(), 'AppData', 'Roaming', 'ac7-vr-launcher');
+const managedRoot = app.getPath('userData');
 const settingsPath = path.join(managedRoot, 'settings.json');
 const uevrCfgAsset = path.resolve(__dirname, '../assets/ac7-uevr.cfg');
 

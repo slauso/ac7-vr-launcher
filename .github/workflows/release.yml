@@ -26,6 +26,7 @@ on:
     branches:
       - main
       - copilot/build-electron-typescript-wizard
+      - copilot/add-vendored-release-integration
   workflow_dispatch:
 
 permissions:
