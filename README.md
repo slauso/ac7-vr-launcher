@@ -120,12 +120,13 @@ cd ac7-vr-launcher
 npm install
 ```
 
-Then open the folder in Visual Studio:
+Then open the folder in your IDE:
 
-1. Open **Visual Studio**.
-2. Select **File → Open → Folder...**.
-3. Choose the cloned `ac7-vr-launcher` directory.
-4. Use the built-in terminal (or Developer PowerShell) to run:
+1. Open **Visual Studio 2022** (or **Visual Studio Code**).
+2. Open the cloned `ac7-vr-launcher` folder:
+   - **Visual Studio 2022**: **File → Open → Folder...**
+   - **Visual Studio Code**: **File → Open Folder...**
+3. Use the built-in terminal (or Developer PowerShell) to run:
 
    ```bash
    npm run dev
