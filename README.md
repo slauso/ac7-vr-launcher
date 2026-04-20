@@ -110,6 +110,28 @@ npm install
 npm run dev
 ```
 
+### Clone the full project for local development (Visual Studio)
+
+If you want the **entire source project** on your machine (not just the installer), clone the repository directly:
+
+```bash
+git clone https://github.com/slauso/ac7-vr-launcher.git
+cd ac7-vr-launcher
+npm install
+```
+
+Then open the folder in your IDE:
+
+1. Open **Visual Studio 2022** (or **Visual Studio Code**).
+2. Open the cloned `ac7-vr-launcher` folder:
+   - **Visual Studio 2022**: **File → Open → Folder...**
+   - **Visual Studio Code**: **File → Open Folder...**
+3. Use the built-in terminal (or Developer PowerShell) to run:
+
+   ```bash
+   npm run dev
+   ```
+
 ## Build
 
 End users do **not** need to build anything — grab the latest `AC7-VR-Launcher-<version>-Setup.exe` from the [Releases page](https://github.com/slauso/ac7-vr-launcher/releases) and run it.
